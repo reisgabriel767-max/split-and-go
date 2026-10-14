@@ -1,21 +1,28 @@
 import { PGlite } from "@electric-sql/pglite";
 import { Pool } from "pg";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 
 export interface Database {
+  exec(sql: string): Promise<void>;
   query<T>(sql: string, values?: unknown[]): Promise<T[]>;
   transaction<T>(callback: (db: Database) => Promise<T>): Promise<T>;
 }
 
 function embedded(pg: PGlite): Database {
   return {
+    async exec(sql: string) {
+      await pg.exec(sql);
+    },
     async query<T>(sql: string, values: unknown[] = []) {
       return (await pg.query<T>(sql, values)).rows;
     },
     async transaction<T>(callback: (db: Database) => Promise<T>) {
       return pg.transaction(async (tx) =>
         callback({
+          async exec(sql: string) {
+            await tx.exec(sql);
+          },
           async query<R>(sql: string, values: unknown[] = []) {
             return (await tx.query<R>(sql, values)).rows;
           },
@@ -36,6 +43,9 @@ async function connect(): Promise<Database> {
       max: 5,
     });
     db = {
+      async exec(sql: string) {
+        await pool.query(sql);
+      },
       async query<T>(sql: string, values: unknown[] = []) {
         return (await pool.query(sql, values)).rows as T[];
       },
@@ -44,6 +54,9 @@ async function connect(): Promise<Database> {
         try {
           await client.query("BEGIN");
           const result = await callback({
+            async exec(sql: string) {
+              await client.query(sql);
+            },
             async query<R>(sql: string, values: unknown[] = []) {
               return (await client.query(sql, values)).rows as R[];
             },
@@ -74,16 +87,35 @@ async function connect(): Promise<Database> {
     await pg.waitReady;
     db = embedded(pg);
   }
-  const schema = await readFile(
-    path.join(process.cwd(), "db", "001_initial.sql"),
-    "utf8",
-  );
-  // The first slice has one idempotent schema; versioned migrations follow when it evolves.
-  await db.transaction(async (tx) => {
-    for (const statement of schema.split(";").filter((part) => part.trim()))
-      await tx.query(statement);
-  });
+  await migrate(db);
   return db;
+}
+
+export async function migrate(db: Database) {
+  const directory = path.join(process.cwd(), "db");
+  const files = (await readdir(directory))
+    .filter((file) => /^\d{3}_[a-z_]+\.sql$/.test(file))
+    .sort();
+  await db.transaction(async (tx) => {
+    await tx.exec(
+      "CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY)",
+    );
+    await tx.exec("LOCK TABLE schema_migrations IN EXCLUSIVE MODE");
+    const applied = new Set(
+      (
+        await tx.query<{ version: string }>(
+          "SELECT version FROM schema_migrations",
+        )
+      ).map((row) => row.version),
+    );
+    for (const file of files) {
+      if (applied.has(file)) continue;
+      await tx.exec(await readFile(path.join(directory, file), "utf8"));
+      await tx.query("INSERT INTO schema_migrations (version) VALUES ($1)", [
+        file,
+      ]);
+    }
+  });
 }
 
 const state = globalThis as typeof globalThis & {

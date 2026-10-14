@@ -1326,6 +1326,125 @@ legend {
     overflow-x: auto;
   }
 }
+.split-mode-field {
+  margin-bottom: 20px;
+}
+.dialog-head {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 2;
+}
+.split-modes button {
+  gap: 6px;
+  font-size: 11px;
+  padding: 11px 6px;
+}
+.split-participants {
+  max-height: 260px;
+}
+.split-person {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 56px;
+  padding: 7px 0;
+  border-bottom: 1px solid #f0f2f3;
+}
+.split-person:last-child {
+  border: 0;
+}
+.split-person .participant-check {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+.participant-name {
+  overflow-wrap: anywhere;
+}
+.allocation-control {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+}
+.allocation-input {
+  position: relative;
+  width: 116px;
+}
+.allocation-input input {
+  padding: 9px 34px 9px 9px;
+  min-height: 36px;
+  height: 36px;
+  text-align: right;
+  font-size: 12px;
+}
+.allocation-input > span {
+  position: absolute;
+  right: 9px;
+  top: 12px;
+  font-size: 10px;
+  color: var(--muted);
+  pointer-events: none;
+}
+.share-preview {
+  font-size: 11px;
+  color: var(--green);
+  white-space: nowrap;
+}
+.allocation-control .share-preview {
+  font-size: 10px;
+}
+.allocation-total {
+  margin-top: 15px;
+  padding: 13px 12px;
+  border-radius: 5px;
+  font-size: 11px;
+  background: #f4f6f7;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.allocation-total > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.allocation-total strong {
+  margin-left: auto;
+  font-size: 12px;
+}
+.allocation-total.valid {
+  background: var(--soft-green);
+  color: var(--green);
+}
+.allocation-total.pending > div:last-child {
+  color: var(--orange);
+}
+.allocation-total.valid > div:last-child {
+  border-top: 1px solid #d4e9dc;
+  padding-top: 10px;
+}
+.statement-mode {
+  display: block;
+  margin-top: 7px;
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 400;
+}
+@media (max-width: 520px) {
+  .split-modes {
+    gap: 5px;
+  }
+  .split-modes button {
+    font-size: 10px;
+    gap: 5px;
+  }
+  .allocation-input {
+    width: 104px;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .spin {
     animation: none;

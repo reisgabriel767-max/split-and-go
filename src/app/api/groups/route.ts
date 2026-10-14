@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { database } from "@/lib/db";
-import { splitEqually } from "@/lib/money";
+import { calculateSplit, SplitError } from "@/lib/money";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,6 +27,24 @@ const createMember = z.object({
   groupId: z.uuid(),
   name,
 });
+const allocation = z.object({
+  memberId: z.uuid(),
+  value: z.number().int().nonnegative().max(999999999),
+});
+const splitSchema = z.discriminatedUnion("mode", [
+  z.object({ mode: z.literal("equal") }),
+  z.object({
+    mode: z.literal("percentage"),
+    allocations: z
+      .array(allocation.extend({ value: z.number().int().min(0).max(10000) }))
+      .min(1)
+      .max(30),
+  }),
+  z.object({
+    mode: z.literal("fixed"),
+    allocations: z.array(allocation).min(1).max(30),
+  }),
+]);
 const createExpense = z
   .object({
     action: z.literal("expense"),
@@ -36,6 +54,7 @@ const createExpense = z
     amount: z.number().int().positive().max(999999999),
     spentOn: z.iso.date(),
     memberIds: z.array(z.uuid()).min(1).max(30),
+    split: splitSchema.default({ mode: "equal" }),
   })
   .refine(
     (data) => new Set(data.memberIds).size === data.memberIds.length,
@@ -52,10 +71,10 @@ export async function GET() {
         "SELECT id, group_id, name FROM members ORDER BY created_at, id",
       ),
       expenses: await tx.query(
-        "SELECT id, group_id, payer_id, description, amount, to_char(spent_on, 'YYYY-MM-DD') AS spent_on FROM expenses ORDER BY spent_on DESC, created_at DESC, id",
+        "SELECT id, group_id, payer_id, description, amount, split_mode, to_char(spent_on, 'YYYY-MM-DD') AS spent_on FROM expenses ORDER BY spent_on DESC, created_at DESC, id",
       ),
       shares: await tx.query(
-        "SELECT expense_id, member_id, amount FROM expense_shares",
+        "SELECT expense_id, member_id, amount, percentage FROM expense_shares",
       ),
     }));
     return NextResponse.json(data);
@@ -98,6 +117,10 @@ export async function POST(request: NextRequest) {
     );
   const value = parsed.data;
   try {
+    const shares =
+      value.action === "expense"
+        ? calculateSplit(value.amount, value.memberIds, value.split)
+        : [];
     const db = await database();
     const id = await db.transaction(async (tx) => {
       const id = randomUUID();
@@ -139,7 +162,7 @@ export async function POST(request: NextRequest) {
           )
             throw new Error("INVALID_MEMBERS");
           await tx.query(
-            "INSERT INTO expenses (id,group_id,payer_id,description,amount,spent_on) VALUES ($1,$2,$3,$4,$5,$6)",
+            "INSERT INTO expenses (id,group_id,payer_id,description,amount,spent_on,split_mode) VALUES ($1,$2,$3,$4,$5,$6,$7)",
             [
               id,
               value.groupId,
@@ -147,12 +170,19 @@ export async function POST(request: NextRequest) {
               value.description,
               value.amount,
               value.spentOn,
+              value.split.mode,
             ],
           );
-          for (const share of splitEqually(value.amount, value.memberIds)) {
+          for (const share of shares) {
             await tx.query(
-              "INSERT INTO expense_shares (expense_id,group_id,member_id,amount) VALUES ($1,$2,$3,$4)",
-              [id, value.groupId, share.memberId, share.amount],
+              "INSERT INTO expense_shares (expense_id,group_id,member_id,amount,percentage) VALUES ($1,$2,$3,$4,$5)",
+              [
+                id,
+                value.groupId,
+                share.memberId,
+                share.amount,
+                share.percentage ?? null,
+              ],
             );
           }
         }
@@ -161,6 +191,8 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ id }, { status: 201 });
   } catch (error) {
+    if (error instanceof SplitError)
+      return NextResponse.json({ error: error.message }, { status: 400 });
     const code = (error as { code?: string }).code;
     const message = (error as Error).message;
     if (code === "23505")

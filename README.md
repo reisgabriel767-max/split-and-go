@@ -4,9 +4,9 @@ MVP para organizar despesas de grupos, calcular saldos individuais e sugerir um 
 
 ## Status
 
-Primeiro fluxo implementado com Next.js 16, React 19, TypeScript e PostgreSQL: criar grupos, cadastrar participantes, registrar despesas com rateio igualitario, consultar saldos e extratos individuais. Os dados persistem entre recargas.
+Fluxo implementado com Next.js 16, React 19, TypeScript e PostgreSQL: criar grupos, cadastrar participantes, registrar despesas com rateio igualitario, percentual ou por valor fixo, consultar saldos e extratos individuais. Os dados persistem entre recargas.
 
-Ainda faltam rateio percentual e por valor fixo, conversao entre moedas e plano otimizado de transferencias. Nesta etapa, cada despesa usa a moeda base do grupo (BRL, USD ou EUR). Nao ha autenticacao, edicao ou exclusao de lancamentos; o ambiente atual e uma demonstracao local.
+Ainda faltam conversao entre moedas e plano otimizado de transferencias. Nesta etapa, cada despesa usa a moeda base do grupo (BRL, USD ou EUR). Nao ha autenticacao, edicao ou exclusao de lancamentos; o ambiente atual e uma demonstracao local.
 
 ## Arquitetura proposta
 
@@ -41,6 +41,8 @@ O pagador e todos os participantes de uma despesa devem pertencer ao grupo. Um m
 - A conversao usa aritmetica decimal e arredondamento half-up uma unica vez. O rateio opera sobre o total convertido.
 - No rateio igualitario ou percentual, centavos restantes sao distribuidos pelo metodo dos maiores restos, com desempate por identificador estavel do participante. Percentuais sao expressos em pontos-base e devem somar 10.000 (100%).
 - Valores fixos sao informados na moeda base e devem somar exatamente o total convertido.
+- Percentuais aceitam ate duas casas decimais (por exemplo, 33,33%) e devem somar exatamente 100%; valores fixos devem fechar o total em centavos. A interface mostra os totais e a diferenca; o servidor valida novamente antes de gravar.
+- Uma parte pode ser zero nos modos percentual e fixo. Quem nao participa e desmarcado; o pagador pode ficar fora do rateio. O modo e as partes de cada despesa ficam registrados; adicionar membros depois nao altera o historico.
 - Saldo individual = total pago na moeda base menos total devido. A soma dos saldos do grupo deve ser zero.
 
 ### Plano de acerto
@@ -111,9 +113,25 @@ npm run typecheck
 npm run build
 ```
 
-Os testes cobrem valores decimais, preservacao de centavos, membros duplicados, datas invalidas, associacao ao grupo, gravacao transacional e manutencao de partes historicas ao adicionar participantes. A interface foi verificada em desktop e celular, incluindo criacao de grupo, despesa, saldos e recarga com dados persistidos. O build de producao foi verificado; a conexao com PostgreSQL externo via Docker continua pendente.
+Os testes cobrem valores decimais, preservacao de centavos nos tres modos, maiores restos e desempates estaveis, totais inconsistentes, membros duplicados ou externos, datas invalidas, persistencia de percentuais e manutencao de partes historicas. A migracao de despesas antigas para o modo igualitario tambem e testada. A interface foi verificada em desktop e celular, incluindo erros de total, os novos rateios e extratos apos recarregar. O build de producao foi verificado; a conexao com PostgreSQL externo via Docker continua pendente.
 
-O esquema inicial esta em `db/001_initial.sql` e e aplicado de forma idempotente. Mudancas futuras exigirao migracoes versionadas; alterar esse arquivo nao migra tabelas existentes.
+O esquema evolui por arquivos SQL ordenados em `db/`. A tabela `schema_migrations` registra os arquivos ja aplicados; a inicializacao aplica os pendentes em transacao, com bloqueio dessa tabela. `002_split_modes.sql` adiciona o modo e os percentuais, preservando despesas existentes como igualitarias. Para futuras alteracoes, adicione uma nova migracao; nao edite migracoes aplicadas. Reinicie a aplicacao depois de adicionar migracoes.
+
+### Contrato do rateio
+
+Em `POST /api/groups`, uma despesa recebe `memberIds` e um campo `split`:
+
+```json
+{
+  "mode": "percentage",
+  "allocations": [
+    { "memberId": "UUID-do-participante-1", "value": 6000 },
+    { "memberId": "UUID-do-participante-2", "value": 4000 }
+  ]
+}
+```
+
+O campo `value` usa pontos-base no modo `percentage` (6000 = 60%) e centavos no modo `fixed`. As partes devem corresponder exatamente aos `memberIds`, sem faltantes, extras ou repeticoes. O modo `equal` usa apenas `{ "mode": "equal" }`. Omitir `split` mantem a compatibilidade com o fluxo inicial e assume divisao igualitaria. Os exemplos de identificadores acima sao ilustrativos; envie UUIDs reais do grupo.
 
 ### Estrutura
 

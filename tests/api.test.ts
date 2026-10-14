@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import { GET, POST } from "../src/app/api/groups/route";
+import type { GroupData } from "../src/lib/types";
 
 Object.assign(process.env, { NODE_ENV: "test" });
 delete process.env.DATABASE_URL;
@@ -138,4 +139,122 @@ test("group-to-expense flow persists exact shares, enforces membership and rejec
     3,
     "new members must not change historical expense shares",
   );
+});
+
+test("custom split requests validate totals and membership and persist the chosen mode and percentages", async () => {
+  const group = await POST(
+    request({
+      action: "group",
+      name: "Rateios",
+      currency: "BRL",
+      category: "event",
+      members: ["Alice", "Bob", "Carol"],
+    }),
+  );
+  const { id: groupId } = await group.json();
+  const state: GroupData = await (await GET()).json();
+  const members = state.members.filter((m) => m.group_id === groupId);
+  const ids = members.map((m) => m.id).sort();
+  const expense = {
+    action: "expense",
+    groupId,
+    payerId: ids[0],
+    description: "Percentual",
+    amount: 1001,
+    spentOn: "2026-10-14",
+    memberIds: ids,
+  };
+  const allocations = ids.map((memberId, index) => ({
+    memberId,
+    value: [5000, 3000, 2000][index],
+  }));
+  const percentage = await POST(
+    request({ ...expense, split: { mode: "percentage", allocations } }),
+  );
+  assert.equal(percentage.status, 201);
+  const { id: percentageId } = await percentage.json();
+  const fixedParts = ids.map((memberId, index) => ({
+    memberId,
+    value: [700, 301, 0][index],
+  }));
+  const fixed = await POST(
+    request({
+      ...expense,
+      description: "Fixo",
+      split: { mode: "fixed", allocations: fixedParts },
+    }),
+  );
+  assert.equal(fixed.status, 201);
+  const { id: fixedId } = await fixed.json();
+
+  for (const split of [
+    {
+      mode: "percentage",
+      allocations: allocations.map((a) => ({ ...a, value: 1000 })),
+    },
+    {
+      mode: "percentage",
+      allocations: [allocations[0], allocations[0], allocations[2]],
+    },
+    { mode: "percentage", allocations: allocations.slice(1) },
+    {
+      mode: "percentage",
+      allocations: [
+        { memberId: ids[0], value: 10001 },
+        { memberId: ids[1], value: -1 },
+        { memberId: ids[2], value: 0 },
+      ],
+    },
+    {
+      mode: "percentage",
+      allocations: [
+        { memberId: ids[0], value: 5000.5 },
+        { memberId: ids[1], value: 2999.5 },
+        { memberId: ids[2], value: 2000 },
+      ],
+    },
+    { mode: "fixed", allocations: fixedParts.map((a) => ({ ...a, value: 1 })) },
+    {
+      mode: "fixed",
+      allocations: [
+        ...fixedParts.slice(0, 2),
+        { memberId: "11111111-1111-4111-8111-111111111111", value: 0 },
+      ],
+    },
+  ])
+    assert.equal((await POST(request({ ...expense, split }))).status, 400);
+  const saved: GroupData = await (await GET()).json();
+  assert.equal(
+    saved.expenses.filter((e) => e.group_id === groupId).length,
+    2,
+    "invalid requests must not create expense rows",
+  );
+  assert.equal(
+    saved.expenses.find((e) => e.id === percentageId)?.split_mode,
+    "percentage",
+  );
+  assert.equal(
+    saved.expenses.find((e) => e.id === fixedId)?.split_mode,
+    "fixed",
+  );
+  for (const [id, values] of [
+    [percentageId, [501, 300, 200]],
+    [fixedId, [700, 301, 0]],
+  ] as [string, number[]][]) {
+    const parts = saved.shares
+      .filter((s) => s.expense_id === id)
+      .sort((a, b) => a.member_id.localeCompare(b.member_id));
+    assert.deepEqual(
+      parts.map((p) => p.amount),
+      values,
+    );
+    assert.equal(
+      parts.reduce((sum, p) => sum + p.amount, 0),
+      1001,
+    );
+    assert.deepEqual(
+      parts.map((p) => p.percentage),
+      id === percentageId ? [5000, 3000, 2000] : [null, null, null],
+    );
+  }
 });

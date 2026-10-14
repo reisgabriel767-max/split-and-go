@@ -41,7 +41,7 @@ Criterios de aceite:
 
 ## EXPENSE-01 - Registrar e ratear despesas
 
-Andamento: rateio igualitario implementado e validado. Percentuais e valores fixos continuam pendentes.
+Concluido: rateios igualitario, percentual e por valor fixo implementados. Totais, pertencimento ao grupo, centavos e historico sao validados no servidor e nos testes; os tres modos foram conferidos no navegador. Migracao preserva despesas antigas como igualitarias.
 
 Criterios de aceite:
 - Informar descricao, valor, moeda, pagador e participantes.

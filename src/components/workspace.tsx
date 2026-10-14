@@ -29,8 +29,18 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import type { Category, GroupData, Member } from "@/lib/types";
-import { formatMoney, parseMoney } from "@/lib/money";
+import type { Category, GroupData, Member, SplitMode } from "@/lib/types";
+import {
+  calculateSplit,
+  formatMoney,
+  formatPercentage,
+  parseMoney,
+  splitEqually,
+} from "@/lib/money";
+import ExpenseSplit, {
+  readSplitSpec,
+  splitLabels,
+} from "@/components/expense-split";
 
 const categories = {
   trip: {
@@ -125,6 +135,12 @@ export default function Workspace() {
   const [notice, setNotice] = useState("");
   const [category, setCategory] = useState<Category>("trip");
   const [participants, setParticipants] = useState<string[]>([]);
+  const [splitMode, setSplitMode] = useState<SplitMode>("equal");
+  const [percentageValues, setPercentageValues] = useState<
+    Record<string, string>
+  >({});
+  const [fixedValues, setFixedValues] = useState<Record<string, string>>({});
+  const [expenseAmount, setExpenseAmount] = useState("");
   const [memberDetail, setMemberDetail] = useState<string | null>(null);
   const group = data.groups.find((g) => g.id === selected) ?? data.groups[0];
   const members = data.members.filter((m) => m.group_id === group?.id);
@@ -174,6 +190,22 @@ export default function Workspace() {
     setError("");
     setModal(kind);
     setParticipants(members.map((m) => m.id));
+    setSplitMode("equal");
+    setExpenseAmount("");
+    setFixedValues({});
+    setPercentageValues(
+      members.length
+        ? Object.fromEntries(
+            splitEqually(
+              10000,
+              members.map((m) => m.id),
+            ).map((part) => [
+              part.memberId,
+              (part.amount / 100).toFixed(2).replace(".", ","),
+            ]),
+          )
+        : {},
+    );
   }
   function chooseGroup(id: string) {
     setSelected(id);
@@ -214,14 +246,22 @@ export default function Workspace() {
       } else {
         if (!participants.length)
           throw new Error("Selecione quem participa da despesa.");
+        const amount = parseMoney(String(form.get("amount")));
+        const split = readSplitSpec(
+          splitMode,
+          participants,
+          splitMode === "percentage" ? percentageValues : fixedValues,
+        );
+        calculateSplit(amount, participants, split);
         payload = {
           action: "expense",
           groupId: group?.id,
           description: form.get("description"),
-          amount: parseMoney(String(form.get("amount"))),
+          amount,
           payerId: form.get("payer"),
           spentOn: form.get("date"),
           memberIds: participants,
+          split,
         };
       }
       const response = await fetch("/api/groups", {
@@ -549,7 +589,7 @@ export default function Workspace() {
                           </span>
                           <div className="expense-value">
                             <strong>{money(expense.amount)}</strong>
-                            <span>Divisao igualitaria</span>
+                            <span>{splitLabels[expense.split_mode]}</span>
                           </div>
                         </div>
                       ))}
@@ -591,29 +631,38 @@ export default function Workspace() {
                                 s.member_id === memberDetail,
                             ),
                         )
-                        .map((e) => (
-                          <div className="statement-row" key={e.id}>
-                            <strong>{e.description}</strong>
-                            <div>
-                              <span>
-                                Pagou:{" "}
-                                {money(
-                                  e.payer_id === memberDetail ? e.amount : 0,
-                                )}
-                              </span>
-                              <span>
-                                Sua parte:{" "}
-                                {money(
-                                  data.shares.find(
-                                    (s) =>
-                                      s.expense_id === e.id &&
-                                      s.member_id === memberDetail,
-                                  )?.amount ?? 0,
-                                )}
-                              </span>
+                        .map((e) => {
+                          const share = data.shares.find(
+                            (s) =>
+                              s.expense_id === e.id &&
+                              s.member_id === memberDetail,
+                          );
+                          return (
+                            <div className="statement-row" key={e.id}>
+                              <strong>
+                                {e.description}
+                                <span className="statement-mode">
+                                  {splitLabels[e.split_mode]}
+                                </span>
+                              </strong>
+                              <div>
+                                <span>
+                                  Pagou:{" "}
+                                  {money(
+                                    e.payer_id === memberDetail ? e.amount : 0,
+                                  )}
+                                </span>
+                                <span>
+                                  Sua parte
+                                  {share?.percentage != null
+                                    ? ` (${formatPercentage(share.percentage)})`
+                                    : ""}
+                                  : {money(share?.amount ?? 0)}
+                                </span>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       {!expenses.length && (
                         <p className="muted">Nenhuma despesa registrada.</p>
                       )}
@@ -806,6 +855,11 @@ export default function Workspace() {
                     Valor ({currency})
                     <input
                       name="amount"
+                      value={expenseAmount}
+                      onChange={(event) => {
+                        setExpenseAmount(event.target.value);
+                        setError("");
+                      }}
                       placeholder="0,00"
                       inputMode="decimal"
                       required
@@ -832,36 +886,32 @@ export default function Workspace() {
                     ))}
                   </select>
                 </label>
-                <fieldset className="participant-field">
-                  <legend>Dividir igualmente entre</legend>
-                  {members.map((member, index) => (
-                    <label className="participant-check" key={member.id}>
-                      <input
-                        type="checkbox"
-                        checked={participants.includes(member.id)}
-                        onChange={(event) =>
-                          setParticipants((current) =>
-                            event.target.checked
-                              ? [...current, member.id]
-                              : current.filter((id) => id !== member.id),
-                          )
-                        }
-                      />
-                      <Avatar member={member} index={index} />
-                      <span>{member.name}</span>
-                    </label>
-                  ))}
-                </fieldset>
-                <div className="split-summary">
-                  <ArrowLeftRight size={16} />
-                  <span>
-                    {participants.length}{" "}
-                    {participants.length === 1
-                      ? "participante selecionado"
-                      : "participantes selecionados"}
-                  </span>
-                  <span>Partes iguais</span>
-                </div>
+                <ExpenseSplit
+                  members={members}
+                  participants={participants}
+                  mode={splitMode}
+                  values={
+                    splitMode === "percentage" ? percentageValues : fixedValues
+                  }
+                  amount={expenseAmount}
+                  currency={currency}
+                  onMode={(mode) => {
+                    setSplitMode(mode);
+                    setError("");
+                  }}
+                  onParticipants={(ids) => {
+                    setParticipants(ids);
+                    setError("");
+                  }}
+                  onValue={(id, value) => {
+                    setError("");
+                    const setter =
+                      splitMode === "percentage"
+                        ? setPercentageValues
+                        : setFixedValues;
+                    setter((current) => ({ ...current, [id]: value }));
+                  }}
+                />
               </>
             )}
             {error && (
