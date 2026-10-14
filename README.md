@@ -121,7 +121,7 @@ npm run typecheck
 npm run build
 ```
 
-Os 23 testes cobrem rateios, cambio, historico, migracoes, plano de acerto, consistencia de leitura e limite de membros, incluindo compatibilidade com grupos legados maiores. No PGlite, 22 passam e o teste de duas conexoes concorrentes fica ignorado. A suite anterior de 21 testes passou no PostgreSQL externo e na CI com container PostgreSQL 17, incluindo o fluxo HTTP compilado. A ampliacao para o limite de membros ainda aguarda sua execucao remota. A interface foi verificada em desktop e celular; a rejeicao de um grupo com 21 nomes tambem foi conferida no navegador. O comando Compose local, incluindo seu volume persistente, ainda nao foi executado.
+Os 23 testes cobrem rateios, cambio, historico, migracoes, plano de acerto, consistencia de leitura e limite de membros, incluindo compatibilidade com grupos legados maiores. No PGlite, 22 passam e o teste de duas conexoes concorrentes fica ignorado. Todos os 23 passaram na [CI com container PostgreSQL 17](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38650831945), incluindo tipos, build e fluxo HTTP compilado. A interface foi verificada em desktop e celular; a rejeicao de um grupo com 21 nomes tambem foi conferida no navegador. O comando Compose local, incluindo seu volume persistente, ainda nao foi executado.
 
 ### Validacao com PostgreSQL externo
 

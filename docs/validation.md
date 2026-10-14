@@ -20,7 +20,7 @@ Por decisao do responsavel, novos grupos e inclusoes posteriores ficam limitados
 - Suite ampliada: 22 testes aprovados no PGlite, um caso de concorrencia ignorado por exigir PostgreSQL externo.
 - Build com verificacao de tipos aprovado.
 - Navegador: cadastro com 21 nomes rejeitado sem criar grupo. Dados demonstrativos anteriores preservados.
-- CI desta ampliacao ainda pendente de publicacao.
+- CI desta ampliacao aprovada: [execucao 38650831945](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38650831945), commit 2bba1df. Os 23 testes passaram no PostgreSQL 17-alpine, incluindo inclusoes simultaneas no ultimo espaco disponivel. Tipos, build e fluxo HTTP da aplicacao compilada tambem aprovados.
 
 O build precisou executar fora do sandbox do Windows porque o Turbopack cria junctions. Os testes externos tambem precisaram de acesso a conexao local fora do sandbox. Essas restricoes nao exigiram alteracoes na configuracao do aplicativo.
 
