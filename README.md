@@ -4,7 +4,9 @@ MVP para organizar despesas de grupos, calcular saldos individuais e sugerir um 
 
 ## Status
 
-Projeto em planejamento. A aplicacao ainda nao foi implementada. A proposta inicial usa Next.js, TypeScript e PostgreSQL; versoes e instrucoes de execucao serao registradas com a primeira implementacao.
+Primeiro fluxo implementado com Next.js 16, React 19, TypeScript e PostgreSQL: criar grupos, cadastrar participantes, registrar despesas com rateio igualitario, consultar saldos e extratos individuais. Os dados persistem entre recargas.
+
+Ainda faltam rateio percentual e por valor fixo, conversao entre moedas e plano otimizado de transferencias. Nesta etapa, cada despesa usa a moeda base do grupo (BRL, USD ou EUR). Nao ha autenticacao, edicao ou exclusao de lancamentos; o ambiente atual e uma demonstracao local.
 
 ## Arquitetura proposta
 
@@ -18,9 +20,9 @@ flowchart LR
     Data --> DB[(PostgreSQL)]
 ```
 
-O navegador chama endpoints do servidor. A camada de dominio recebe dados validados e calcula rateios e saldos; a persistencia grava uma despesa e suas partes na mesma transacao. Credenciais do banco ficam somente no servidor.
+O navegador chama `GET/POST /api/groups`. O servidor valida os dados com Zod e calcula o rateio em `src/lib/money.ts`; a persistencia grava uma despesa e suas partes na mesma transacao. A interface deriva saldos e extratos dos lancamentos e partes gravados. Credenciais do banco ficam somente no servidor.
 
-O desenvolvimento local tera a aplicacao Node.js e um PostgreSQL via Docker Compose. O deploy sera definido e validado depois da implementacao. Filas, cache e servicos separados nao sao necessarios para o volume esperado do MVP.
+O desenvolvimento local usa a aplicacao Node.js com PostgreSQL embarcado (PGlite) por padrao, sem Docker. Quando `DATABASE_URL` esta definida, a mesma camada de persistencia usa `pg` para conectar ao PostgreSQL externo. `compose.yaml` prepara esse banco; esse caminho ainda nao foi executado neste computador, que nao possui Docker disponivel. Producao exige `DATABASE_URL`; o fallback embarcado e restrito a desenvolvimento e testes. O deploy sera definido depois da implementacao. Filas e cache nao sao necessarios para este recorte.
 
 ### Modelo de dados previsto
 
@@ -82,4 +84,44 @@ Os commits devem ser pequenos e descrever mudancas reais, seguindo Conventional 
 
 ## Execucao local
 
-Ainda nao existe aplicacao executavel. Os comandos, variaveis de ambiente e servicos locais serao adicionados e testados na etapa de implementacao.
+Requisito: Node.js 20.9 ou superior, com npm.
+
+```sh
+npm ci
+npm run dev
+```
+
+Abra `http://127.0.0.1:3000`. Na primeira requisicao, o banco e o esquema sao criados automaticamente. O banco local fica em `.data/postgres/`, ignorado pelo Git. Execute apenas uma instancia da aplicacao sobre esse diretorio. Os testes usam um banco separado em memoria, sem alterar dados da demonstracao. Nao use a demonstracao sem autenticacao como ambiente publico de producao.
+
+### PostgreSQL via Docker
+
+Com Docker instalado:
+
+```sh
+docker compose up -d --wait
+```
+
+Copie `.env.example` para `.env.local`, ative a linha `DATABASE_URL` e reinicie `npm run dev`. O PostgreSQL e publicado apenas em `127.0.0.1:5432`. A senha de `compose.yaml` e exclusiva da demonstracao local. O volume `splitgo_data` preserva os dados; alternar entre os bancos nao transfere os registros automaticamente.
+
+### Verificacao
+
+```sh
+npm test
+npm run typecheck
+npm run build
+```
+
+Os testes cobrem valores decimais, preservacao de centavos, membros duplicados, datas invalidas, associacao ao grupo, gravacao transacional e manutencao de partes historicas ao adicionar participantes. A interface foi verificada em desktop e celular, incluindo criacao de grupo, despesa, saldos e recarga com dados persistidos. O build de producao foi verificado; a conexao com PostgreSQL externo via Docker continua pendente.
+
+O esquema inicial esta em `db/001_initial.sql` e e aplicado de forma idempotente. Mudancas futuras exigirao migracoes versionadas; alterar esse arquivo nao migra tabelas existentes.
+
+### Estrutura
+
+- `src/app`: interface e endpoints Next.js.
+- `src/components/workspace.tsx`: grupos, formularios, despesas e extratos.
+- `src/lib/money.ts`: parse monetario e rateio em centavos.
+- `src/lib/db.ts`: conexao e transacoes com PGlite ou PostgreSQL.
+- `db/001_initial.sql`: tabelas, chaves estrangeiras e restricoes.
+- `tests`: testes de dominio e integracao dos endpoints com PostgreSQL embarcado.
+
+As fotografias de capa sao carregadas do Unsplash; a funcionalidade dos grupos nao depende delas.

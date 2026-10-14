@@ -23,6 +23,8 @@ As tarefas estao publicadas como [issues](https://github.com/reisgabriel767-max/
 
 ## ARCH-01 - Definir arquitetura
 
+Andamento: base implementada e validada com PostgreSQL embarcado. A conexao ao PostgreSQL externo do Docker Compose permanece pendente de teste.
+
 Criterios de aceite:
 - Stack e banco escolhidos com justificativa.
 - Diagrama de componentes e infraestrutura no README.
@@ -30,12 +32,16 @@ Criterios de aceite:
 
 ## GROUP-01 - Gerenciar grupos e participantes
 
+Concluido no primeiro fluxo: criacao de grupo e participantes, inclusao posterior de participante e rejeicao de nomes duplicados. Validado por testes de API e navegador.
+
 Criterios de aceite:
 - Criar grupo com nome e moeda base.
 - Adicionar participantes identificados por nome.
 - Impedir participantes invalidos e grupos sem nome.
 
 ## EXPENSE-01 - Registrar e ratear despesas
+
+Andamento: rateio igualitario implementado e validado. Percentuais e valores fixos continuam pendentes.
 
 Criterios de aceite:
 - Informar descricao, valor, moeda, pagador e participantes.
@@ -52,6 +58,8 @@ Criterios de aceite:
 
 ## BALANCE-01 - Calcular saldos e plano de acerto
 
+Andamento: saldos individuais calculados a partir dos pagamentos e partes persistidos. O plano otimizado de acerto ainda nao foi implementado.
+
 Criterios de aceite:
 - Exibir total pago, participacao nas despesas e saldo por participante.
 - Garantir que a soma dos saldos do grupo seja zero.
@@ -61,6 +69,8 @@ Criterios de aceite:
 - Verificar casos com saldo zero, centavos e varias moedas.
 
 ## PANEL-01 - Exibir extratos e fechamento
+
+Andamento: despesas, participantes, saldos e extratos individuais implementados, com layout verificado em desktop e celular. Falta o plano de acerto.
 
 Criterios de aceite:
 - Exibir despesas e extrato de cada participante.
