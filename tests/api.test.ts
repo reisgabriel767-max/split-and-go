@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 import { GET, POST } from "../src/app/api/groups/route";
 import type { GroupData } from "../src/lib/types";
+import { calculateBalances, planSettlement } from "../src/lib/settlement";
 
 Object.assign(process.env, { NODE_ENV: "test" });
 delete process.env.DATABASE_URL;
@@ -257,4 +258,105 @@ test("custom split requests validate totals and membership and persist the chose
       id === percentageId ? [5000, 3000, 2000] : [null, null, null],
     );
   }
+});
+
+test("foreign expenses split the converted amount and retain their original historical rates", async () => {
+  const created = await POST(
+    request({
+      action: "group",
+      name: "Cambio",
+      currency: "BRL",
+      category: "trip",
+      members: ["Ana", "Bruno", "Carla"],
+    }),
+  );
+  const { id: groupId } = await created.json();
+  const initial: GroupData = await (await GET()).json();
+  const members = initial.members.filter((m) => m.group_id === groupId);
+  const ids = members.map((m) => m.id).sort();
+  const value = {
+    action: "expense",
+    groupId,
+    payerId: ids[2],
+    description: "Cambio fixo",
+    amount: 1001,
+    currency: "USD",
+    exchangeRate: "5,25",
+    spentOn: "2026-10-14",
+    memberIds: ids.slice(0, 2),
+    split: {
+      mode: "fixed",
+      allocations: [
+        { memberId: ids[0], value: 3000 },
+        { memberId: ids[1], value: 2255 },
+      ],
+    },
+  };
+  const first = await POST(request(value));
+  assert.equal(first.status, 201);
+  const { id: firstId } = await first.json();
+  const second = await POST(
+    request({
+      ...value,
+      description: "Outra cotacao",
+      exchangeRate: "6",
+      split: {
+        mode: "percentage",
+        allocations: [
+          { memberId: ids[0], value: 6000 },
+          { memberId: ids[1], value: 4000 },
+        ],
+      },
+    }),
+  );
+  assert.equal(second.status, 201);
+  const { id: secondId } = await second.json();
+  for (const change of [
+    { exchangeRate: undefined },
+    { exchangeRate: "0" },
+    { exchangeRate: "-1" },
+    { exchangeRate: "1e2" },
+    { exchangeRate: "1.0000001" },
+    { currency: "BRL", exchangeRate: "2" },
+    { currency: "JPY" },
+    { amount: 1, exchangeRate: "0.001" },
+    {
+      split: {
+        mode: "fixed",
+        allocations: [
+          { memberId: ids[0], value: 500 },
+          { memberId: ids[1], value: 501 },
+        ],
+      },
+    },
+  ])
+    assert.equal((await POST(request({ ...value, ...change }))).status, 400);
+  const saved: GroupData = await (await GET()).json();
+  const expenses = saved.expenses.filter((e) => e.group_id === groupId);
+  assert.equal(expenses.length, 2);
+  const original = expenses.find((e) => e.id === firstId)!;
+  assert.equal(original.amount, 5255);
+  assert.equal(original.original_amount, 1001);
+  assert.equal(original.original_currency, "USD");
+  assert.equal(Number(original.exchange_rate), 5.25);
+  assert.equal(expenses.find((e) => e.id === secondId)!.amount, 6006);
+  assert.deepEqual(
+    saved.shares
+      .filter((s) => s.expense_id === secondId)
+      .sort((a, b) => a.member_id.localeCompare(b.member_id))
+      .map((s) => s.amount),
+    [3604, 2402],
+  );
+  const balances = calculateBalances(members, expenses, saved.shares);
+  assert.equal(
+    balances.reduce((sum, m) => sum + m.balance, 0),
+    0,
+  );
+  const plan = planSettlement(balances);
+  assert.equal(plan.optimal, true);
+  assert.equal(plan.transfers.length, 2);
+  assert.equal(
+    plan.transfers.reduce((sum, t) => sum + t.amount, 0),
+    11261,
+  );
 });

@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { database } from "@/lib/db";
 import { calculateSplit, SplitError } from "@/lib/money";
+import { convertMoney, CurrencyError } from "@/lib/fx";
+import type { Currency } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +57,8 @@ const createExpense = z
     spentOn: z.iso.date(),
     memberIds: z.array(z.uuid()).min(1).max(30),
     split: splitSchema.default({ mode: "equal" }),
+    currency: z.enum(["BRL", "USD", "EUR"]).optional(),
+    exchangeRate: z.string().trim().max(20).optional(),
   })
   .refine(
     (data) => new Set(data.memberIds).size === data.memberIds.length,
@@ -71,7 +75,7 @@ export async function GET() {
         "SELECT id, group_id, name FROM members ORDER BY created_at, id",
       ),
       expenses: await tx.query(
-        "SELECT id, group_id, payer_id, description, amount, split_mode, to_char(spent_on, 'YYYY-MM-DD') AS spent_on FROM expenses ORDER BY spent_on DESC, created_at DESC, id",
+        "SELECT id, group_id, payer_id, description, amount, split_mode, original_amount, original_currency, exchange_rate::text, to_char(spent_on, 'YYYY-MM-DD') AS spent_on FROM expenses ORDER BY spent_on DESC, created_at DESC, id",
       ),
       shares: await tx.query(
         "SELECT expense_id, member_id, amount, percentage FROM expense_shares",
@@ -117,10 +121,6 @@ export async function POST(request: NextRequest) {
     );
   const value = parsed.data;
   try {
-    const shares =
-      value.action === "expense"
-        ? calculateSplit(value.amount, value.memberIds, value.split)
-        : [];
     const db = await database();
     const id = await db.transaction(async (tx) => {
       const id = randomUUID();
@@ -135,8 +135,8 @@ export async function POST(request: NextRequest) {
             [randomUUID(), id, member],
           );
       } else {
-        const group = await tx.query(
-          "SELECT id FROM groups WHERE id=$1 FOR UPDATE",
+        const group = await tx.query<{ id: string; currency: Currency }>(
+          "SELECT id,currency FROM groups WHERE id=$1 FOR UPDATE",
           [value.groupId],
         );
         if (!group.length) throw new Error("GROUP_NOT_FOUND");
@@ -151,6 +151,18 @@ export async function POST(request: NextRequest) {
             [id, value.groupId, value.name],
           );
         } else {
+          const originalCurrency = value.currency ?? group[0].currency;
+          const converted = convertMoney(
+            value.amount,
+            originalCurrency,
+            group[0].currency,
+            value.exchangeRate,
+          );
+          const shares = calculateSplit(
+            converted.amount,
+            value.memberIds,
+            value.split,
+          );
           const members = await tx.query<{ id: string }>(
             "SELECT id FROM members WHERE group_id=$1",
             [value.groupId],
@@ -162,15 +174,18 @@ export async function POST(request: NextRequest) {
           )
             throw new Error("INVALID_MEMBERS");
           await tx.query(
-            "INSERT INTO expenses (id,group_id,payer_id,description,amount,spent_on,split_mode) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+            "INSERT INTO expenses (id,group_id,payer_id,description,amount,spent_on,split_mode,original_amount,original_currency,exchange_rate) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
             [
               id,
               value.groupId,
               value.payerId,
               value.description,
-              value.amount,
+              converted.amount,
               value.spentOn,
               value.split.mode,
+              value.amount,
+              originalCurrency,
+              converted.rate,
             ],
           );
           for (const share of shares) {
@@ -191,7 +206,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ id }, { status: 201 });
   } catch (error) {
-    if (error instanceof SplitError)
+    if (error instanceof SplitError || error instanceof CurrencyError)
       return NextResponse.json({ error: error.message }, { status: 400 });
     const code = (error as { code?: string }).code;
     const message = (error as Error).message;

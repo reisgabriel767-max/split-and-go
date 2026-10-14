@@ -32,6 +32,9 @@ export interface Expense {
   amount: number;
   spent_on: string;
   split_mode: SplitMode;
+  original_amount: number;
+  original_currency: Currency;
+  exchange_rate: string;
 }
 export interface Share {
   expense_id: string;

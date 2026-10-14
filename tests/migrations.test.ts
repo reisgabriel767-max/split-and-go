@@ -9,7 +9,7 @@ test("upgrading an existing initial schema preserves expense values and adds equ
   const db = await database();
   // Recreate the previous schema state only inside this test process's in-memory database.
   await db.exec(
-    "ALTER TABLE expenses DROP COLUMN split_mode; ALTER TABLE expense_shares DROP COLUMN percentage; DROP TABLE schema_migrations;",
+    "ALTER TABLE expenses DROP COLUMN split_mode; ALTER TABLE expenses DROP COLUMN original_amount; ALTER TABLE expenses DROP COLUMN original_currency; ALTER TABLE expenses DROP COLUMN exchange_rate; ALTER TABLE expense_shares DROP COLUMN percentage; DROP TABLE schema_migrations;",
   );
   const group = "11111111-1111-4111-8111-111111111111";
   const member = "22222222-2222-4222-8222-222222222222";
@@ -45,8 +45,21 @@ test("upgrading an existing initial schema preserves expense values and adds equ
     ),
     [{ amount: 1001, percentage: null }],
   );
+  assert.deepEqual(
+    await db.query(
+      "SELECT original_amount,original_currency,exchange_rate::text FROM expenses WHERE id=$1",
+      [expense],
+    ),
+    [
+      {
+        original_amount: 1001,
+        original_currency: "BRL",
+        exchange_rate: "1.000000",
+      },
+    ],
+  );
   assert.equal(
     (await db.query("SELECT version FROM schema_migrations")).length,
-    2,
+    3,
   );
 });

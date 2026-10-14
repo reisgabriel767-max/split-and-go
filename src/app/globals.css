@@ -1326,6 +1326,130 @@ legend {
     overflow-x: auto;
   }
 }
+.conversion-preview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: var(--soft-green);
+  color: var(--green);
+  padding: 14px;
+  border-radius: 5px;
+  margin: -4px 0 20px;
+  font-size: 12px;
+}
+.conversion-preview > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.expense-value .original-value {
+  color: var(--green);
+  font-size: 9px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.settlement-heading > div > p {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+.plan-badge {
+  flex-shrink: 0;
+  padding: 6px 9px;
+  border-radius: 4px;
+  font-size: 9px;
+  color: var(--orange);
+  background: var(--soft-orange);
+}
+.plan-badge.verified {
+  color: var(--green);
+  background: var(--soft-green);
+}
+.transfer-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.transfer-row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 22px 0;
+  border-top: 1px solid var(--line);
+}
+.transfer-number {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #f1f4f5;
+  color: #8b989e;
+  font-size: 11px;
+}
+.transfer-parties {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+}
+.transfer-parties strong {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.transfer-parties svg {
+  color: #93a49b;
+}
+.transfer-value {
+  font-size: 13px;
+  color: var(--green);
+  flex-shrink: 0;
+}
+.settlement-total {
+  border-top: 1px solid var(--line);
+  padding: 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.settlement-total strong {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--ink);
+}
+@media (max-width: 520px) {
+  .tabs {
+    gap: 12px;
+  }
+  .tab {
+    gap: 4px;
+  }
+  .transfer-row {
+    gap: 8px;
+  }
+  .transfer-number {
+    width: 23px;
+    height: 23px;
+    font-size: 10px;
+  }
+  .transfer-parties {
+    font-size: 11px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .transfer-value {
+    font-size: 11px;
+  }
+  .plan-badge {
+    font-size: 8px;
+  }
+}
 .split-mode-field {
   margin-bottom: 20px;
 }

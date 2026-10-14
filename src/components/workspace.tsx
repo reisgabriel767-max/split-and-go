@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -29,7 +30,13 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import type { Category, GroupData, Member, SplitMode } from "@/lib/types";
+import type {
+  Category,
+  Currency,
+  GroupData,
+  Member,
+  SplitMode,
+} from "@/lib/types";
 import {
   calculateSplit,
   formatMoney,
@@ -41,6 +48,11 @@ import ExpenseSplit, {
   readSplitSpec,
   splitLabels,
 } from "@/components/expense-split";
+
+import CurrencyFields from "@/components/currency-fields";
+import SettlementPanel from "@/components/settlement-panel";
+import { convertMoney, moneyInput } from "@/lib/fx";
+import { calculateBalances, planSettlement } from "@/lib/settlement";
 
 const categories = {
   trip: {
@@ -141,6 +153,8 @@ export default function Workspace() {
   >({});
   const [fixedValues, setFixedValues] = useState<Record<string, string>>({});
   const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseCurrency, setExpenseCurrency] = useState<Currency>("BRL");
+  const [exchangeRate, setExchangeRate] = useState("");
   const [memberDetail, setMemberDetail] = useState<string | null>(null);
   const group = data.groups.find((g) => g.id === selected) ?? data.groups[0];
   const members = data.members.filter((m) => m.group_id === group?.id);
@@ -150,16 +164,27 @@ export default function Workspace() {
   const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
   const memberName = (id: string) =>
     members.find((m) => m.id === id)?.name ?? "Participante";
-  const balances = members.map((member) => {
-    const paid = expenses
-      .filter((e) => e.payer_id === member.id)
-      .reduce((sum, e) => sum + e.amount, 0);
-    const expenseIds = new Set(expenses.map((e) => e.id));
-    const owed = data.shares
-      .filter((s) => s.member_id === member.id && expenseIds.has(s.expense_id))
-      .reduce((sum, s) => sum + s.amount, 0);
-    return { ...member, paid, owed, balance: paid - owed };
-  });
+  const balances = useMemo(
+    () =>
+      calculateBalances(
+        data.members.filter((m) => m.group_id === group?.id),
+        data.expenses.filter((e) => e.group_id === group?.id),
+        data.shares,
+      ),
+    [data, group?.id],
+  );
+  const plan = useMemo(() => planSettlement(balances), [balances]);
+  let convertedPreview: number | null = null;
+  try {
+    convertedPreview = convertMoney(
+      parseMoney(expenseAmount),
+      expenseCurrency,
+      currency,
+      expenseCurrency === currency ? "1" : exchangeRate,
+    ).amount;
+  } catch {
+    /* Incomplete forms have no converted preview. */
+  }
   const outstanding = balances.reduce(
     (sum, member) => sum + Math.max(0, member.balance),
     0,
@@ -192,6 +217,8 @@ export default function Workspace() {
     setParticipants(members.map((m) => m.id));
     setSplitMode("equal");
     setExpenseAmount("");
+    setExpenseCurrency(currency);
+    setExchangeRate("");
     setFixedValues({});
     setPercentageValues(
       members.length
@@ -247,12 +274,18 @@ export default function Workspace() {
         if (!participants.length)
           throw new Error("Selecione quem participa da despesa.");
         const amount = parseMoney(String(form.get("amount")));
+        const converted = convertMoney(
+          amount,
+          expenseCurrency,
+          currency,
+          expenseCurrency === currency ? "1" : exchangeRate,
+        );
         const split = readSplitSpec(
           splitMode,
           participants,
           splitMode === "percentage" ? percentageValues : fixedValues,
         );
-        calculateSplit(amount, participants, split);
+        calculateSplit(converted.amount, participants, split);
         payload = {
           action: "expense",
           groupId: group?.id,
@@ -262,6 +295,8 @@ export default function Workspace() {
           spentOn: form.get("date"),
           memberIds: participants,
           split,
+          currency: expenseCurrency,
+          exchangeRate: converted.rate,
         };
       }
       const response = await fetch("/api/groups", {
@@ -514,6 +549,7 @@ export default function Workspace() {
                     ["expenses", "Despesas", Receipt],
                     ["balances", "Saldos", Wallet],
                     ["members", "Participantes", Users],
+                    ["settlement", "Acerto", ArrowLeftRight],
                   ].map(([id, label, Icon]) => {
                     const TabIcon = Icon as typeof Receipt;
                     return (
@@ -590,6 +626,19 @@ export default function Workspace() {
                           <div className="expense-value">
                             <strong>{money(expense.amount)}</strong>
                             <span>{splitLabels[expense.split_mode]}</span>
+                            {expense.original_currency !== currency && (
+                              <span className="original-value">
+                                {formatMoney(
+                                  expense.original_amount,
+                                  expense.original_currency,
+                                )}
+                                <br />1 {expense.original_currency} ={" "}
+                                {new Intl.NumberFormat("pt-BR", {
+                                  maximumFractionDigits: 6,
+                                }).format(Number(expense.exchange_rate))}{" "}
+                                {currency}
+                              </span>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -644,6 +693,20 @@ export default function Workspace() {
                                 <span className="statement-mode">
                                   {splitLabels[e.split_mode]}
                                 </span>
+                                {e.original_currency !== currency && (
+                                  <span className="statement-mode">
+                                    {formatMoney(
+                                      e.original_amount,
+                                      e.original_currency,
+                                    )}{" "}
+                                    <span className="dot-separator">/</span> 1{" "}
+                                    {e.original_currency} ={" "}
+                                    {new Intl.NumberFormat("pt-BR", {
+                                      maximumFractionDigits: 6,
+                                    }).format(Number(e.exchange_rate))}{" "}
+                                    {currency}
+                                  </span>
+                                )}
                               </strong>
                               <div>
                                 <span>
@@ -718,6 +781,13 @@ export default function Workspace() {
                       ))}
                     </>
                   ))}
+                {tab === "settlement" && (
+                  <SettlementPanel
+                    plan={plan}
+                    balances={balances}
+                    currency={currency}
+                  />
+                )}
                 {tab === "members" && (
                   <>
                     <div className="balance-heading">
@@ -852,7 +922,7 @@ export default function Workspace() {
                 </label>
                 <div className="form-grid">
                   <label>
-                    Valor ({currency})
+                    Valor ({expenseCurrency})
                     <input
                       name="amount"
                       value={expenseAmount}
@@ -876,6 +946,21 @@ export default function Workspace() {
                     />
                   </label>
                 </div>
+                <CurrencyFields
+                  source={expenseCurrency}
+                  target={currency}
+                  rate={exchangeRate}
+                  converted={convertedPreview}
+                  onSource={(value) => {
+                    setExpenseCurrency(value);
+                    setExchangeRate("");
+                    setError("");
+                  }}
+                  onRate={(value) => {
+                    setExchangeRate(value);
+                    setError("");
+                  }}
+                />
                 <label>
                   Quem pagou?
                   <select name="payer" defaultValue={members[0]?.id} required>
@@ -893,7 +978,11 @@ export default function Workspace() {
                   values={
                     splitMode === "percentage" ? percentageValues : fixedValues
                   }
-                  amount={expenseAmount}
+                  amount={
+                    convertedPreview === null
+                      ? ""
+                      : moneyInput(convertedPreview)
+                  }
                   currency={currency}
                   onMode={(mode) => {
                     setSplitMode(mode);
