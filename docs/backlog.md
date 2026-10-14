@@ -23,7 +23,7 @@ As tarefas estao publicadas como [issues](https://github.com/reisgabriel767-max/
 
 ## ARCH-01 - Definir arquitetura
 
-Andamento: base implementada e validada com PostgreSQL embarcado. A conexao ao PostgreSQL externo do Docker Compose permanece pendente de teste.
+Concluido: arquitetura e execucao local documentadas; testes passaram com PostgreSQL embarcado e PostgreSQL 18.4 externo. A aplicacao compilada tambem foi validada por HTTP contra o banco externo. O container Docker especifico ainda nao foi executado.
 
 Criterios de aceite:
 - Stack e banco escolhidos com justificativa.
@@ -80,6 +80,8 @@ Criterios de aceite:
 - Exibir o plano de acerto e um estado vazio compreensivel.
 
 ## DELIVERY-01 - Preparar entrega
+
+Andamento: roteiro de demonstracao, relatorio de validacao e checklist de entrega publicados em docs/. Faltam a preparacao pessoal para a apresentacao e a disponibilizacao do quadro aos avaliadores. Deploy permanece opcional.
 
 Criterios de aceite:
 - Documentar pelo menos tres casos de borda.

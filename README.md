@@ -6,7 +6,7 @@ MVP para organizar despesas de grupos, calcular saldos individuais e sugerir um 
 
 Fluxo implementado com Next.js 16, React 19, TypeScript e PostgreSQL: grupos, participantes, tres tipos de rateio, conversao de moedas com cotacao registrada, saldos, extratos e plano de acerto. Os dados persistem entre recargas.
 
-O MVP suporta BRL, USD e EUR. A cotacao e manual, e o minimo global de transferencias e garantido para ate 20 participantes com saldo diferente de zero; veja os limites abaixo. Nao ha autenticacao, edicao ou exclusao de lancamentos; o ambiente atual e uma demonstracao local. A validacao com PostgreSQL via Docker e o acesso dos avaliadores ao quadro continuam pendentes.
+O MVP suporta BRL, USD e EUR. A cotacao e manual, e o minimo global de transferencias e garantido para ate 20 participantes com saldo diferente de zero; veja os limites abaixo. Nao ha autenticacao, edicao ou exclusao de lancamentos; o ambiente atual e uma demonstracao local. Os testes passaram no PostgreSQL embarcado e no PostgreSQL 18 externo, incluindo a aplicacao compilada. A execucao especifica do container Docker e o acesso dos avaliadores ao quadro continuam pendentes.
 
 ## Arquitetura proposta
 
@@ -23,7 +23,7 @@ flowchart LR
 
 O navegador chama `GET/POST /api/groups`. O servidor valida os dados com Zod, converte a moeda em `src/lib/fx.ts` usando Decimal.js e calcula o rateio em `src/lib/money.ts`; a persistencia grava uma despesa e suas partes na mesma transacao. A interface deriva saldos, extratos e transferencias dos lancamentos e partes gravados usando `src/lib/settlement.ts`. Credenciais do banco ficam somente no servidor.
 
-O desenvolvimento local usa a aplicacao Node.js com PostgreSQL embarcado (PGlite) por padrao, sem Docker. Quando `DATABASE_URL` esta definida, a mesma camada de persistencia usa `pg` para conectar ao PostgreSQL externo. `compose.yaml` prepara esse banco; esse caminho ainda nao foi executado neste computador, que nao possui Docker disponivel. Producao exige `DATABASE_URL`; o fallback embarcado e restrito a desenvolvimento e testes. O deploy sera definido depois da implementacao. Filas e cache nao sao necessarios para este recorte.
+O desenvolvimento local usa a aplicacao Node.js com PostgreSQL embarcado (PGlite) por padrao, sem Docker. Quando `DATABASE_URL` esta definida, a mesma camada de persistencia usa `pg` para conectar ao PostgreSQL externo; esse caminho foi validado com PostgreSQL 18.4 nativo. `compose.yaml` fornece PostgreSQL 17, mas o container ainda nao foi executado neste computador, que nao possui Docker disponivel. Producao exige `DATABASE_URL`; o fallback embarcado e restrito a desenvolvimento e testes. O deploy sera definido depois da implementacao. Filas e cache nao sao necessarios para este recorte.
 
 ### Modelo de dados
 
@@ -99,7 +99,7 @@ npm ci
 npm run dev
 ```
 
-Abra `http://127.0.0.1:3000`. Na primeira requisicao, o banco e o esquema sao criados automaticamente. O banco local fica em `.data/postgres/`, ignorado pelo Git. Execute apenas uma instancia da aplicacao sobre esse diretorio. Os testes usam um banco separado em memoria, sem alterar dados da demonstracao. Nao use a demonstracao sem autenticacao como ambiente publico de producao.
+Abra `http://127.0.0.1:3000`. Na primeira requisicao, o banco e o esquema sao criados automaticamente. O banco local fica em `.data/postgres/`, ignorado pelo Git. Execute apenas uma instancia da aplicacao sobre esse diretorio. Por padrao, os testes usam um banco separado em memoria; a verificacao externa usa esquemas temporarios exclusivos. Nao use a demonstracao sem autenticacao como ambiente publico de producao.
 
 ### PostgreSQL via Docker
 
@@ -119,7 +119,27 @@ npm run typecheck
 npm run build
 ```
 
-Os testes cobrem valores decimais, preservacao de centavos nos tres modos, maiores restos e desempates estaveis, totais inconsistentes, membros duplicados ou externos, datas invalidas, persistencia de percentuais e manutencao de partes historicas. A migracao de despesas antigas para o modo igualitario tambem e testada. A interface foi verificada em desktop e celular, incluindo erros de total, os novos rateios e extratos apos recarregar. O build de producao foi verificado; a conexao com PostgreSQL externo via Docker continua pendente.
+Os 19 testes cobrem rateios, cambio, historico, migracoes e plano de acerto, incluindo comparacao com busca exaustiva e o limite de 20 saldos ativos. A interface foi verificada em desktop e celular. A suite passou no PGlite e no PostgreSQL 18.4 externo; o teste HTTP da aplicacao compilada tambem passou. O container PostgreSQL 17 do Compose continua sem execucao verificada.
+
+### Validacao com PostgreSQL externo
+
+Use uma instancia exclusiva de testes, com permissao para criar esquemas. No PowerShell, depois de disponibilizar esse banco:
+
+```powershell
+$env:SPLITGO_TEST_DATABASE_URL = "postgresql://splitgo:splitgo_local@127.0.0.1:5432/splitgo"
+npm run test:postgres
+npm run build
+npm run test:production
+Remove-Item Env:SPLITGO_TEST_DATABASE_URL
+```
+
+`test:postgres` repete os testes com esquemas isolados por arquivo e os remove ao terminar. `test:production` inicia a aplicacao compilada em `127.0.0.1:3100`, cria dados demonstrativos, verifica o fluxo HTTP e encerra o servidor e remove seu esquema temporario. A porta precisa estar livre; para usar outra, defina `SPLITGO_SMOKE_PORT`. Os comandos exigem `SPLITGO_TEST_DATABASE_URL`, sem fallback silencioso para o banco embarcado.
+
+Os resultados observados e as pendencias estao em [docs/validation.md](docs/validation.md); a lista de entrega esta em [docs/delivery.md](docs/delivery.md).
+
+### Integracao continua
+
+O workflow [Validate SplitGo](https://github.com/reisgabriel767-max/split-and-go/actions) repete os testes embarcados, os testes externos com container PostgreSQL 17, o build e o teste HTTP de producao. Ele executa em push e pull request com alteracoes de codigo, e pode ser iniciado manualmente. Alteracoes apenas no README ou em docs/ nao repetem a suite automaticamente. As actions oficiais estao fixadas por commit, com permissao de leitura do repositorio.
 
 O esquema evolui por arquivos SQL ordenados em `db/`. A tabela `schema_migrations` registra os arquivos ja aplicados; a inicializacao aplica os pendentes em transacao, com bloqueio dessa tabela. `002_split_modes.sql` adiciona o modo e os percentuais, preservando despesas existentes como igualitarias. Para futuras alteracoes, adicione uma nova migracao; nao edite migracoes aplicadas. Reinicie a aplicacao depois de adicionar migracoes.
 
@@ -156,4 +176,4 @@ As fotografias de capa sao carregadas do Unsplash; a funcionalidade dos grupos n
 
 ## Demonstracao
 
-O roteiro em [docs/demo.md](docs/demo.md) organiza a apresentacao do produto e a explicacao das decisoes tecnicas. Antes de entregar, valide o caminho Docker, revise o quadro e prepare a explicacao do codigo e o exercicio de logica ao vivo.
+O roteiro em [docs/demo.md](docs/demo.md) organiza a apresentacao do produto e a explicacao das decisoes tecnicas. Antes de entregar, revise o acesso ao quadro e prepare a explicacao do codigo e o exercicio de logica ao vivo. O fluxo local com scripts esta validado; valide o container tambem caso essa seja a forma escolhida para a demonstracao.
