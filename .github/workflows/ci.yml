@@ -1,0 +1,63 @@
+name: Validate SplitGo
+
+on:
+  push:
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: splitgo
+          POSTGRES_PASSWORD: splitgo_ci_only
+          POSTGRES_DB: splitgo
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U splitgo -d splitgo"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Embedded PostgreSQL tests
+        run: npm test
+      - name: External PostgreSQL tests
+        run: npm run test:postgres
+        env:
+          SPLITGO_TEST_DATABASE_URL: postgresql://splitgo:splitgo_ci_only@127.0.0.1:5432/splitgo
+      - run: npm run typecheck
+      - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+      - name: Production HTTP smoke
+        run: npm run test:production
+        env:
+          SPLITGO_TEST_DATABASE_URL: postgresql://splitgo:splitgo_ci_only@127.0.0.1:5432/splitgo

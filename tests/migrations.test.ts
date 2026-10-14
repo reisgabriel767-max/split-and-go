@@ -2,12 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { database, migrate } from "../src/lib/db";
 
-Object.assign(process.env, { NODE_ENV: "test" });
-delete process.env.DATABASE_URL;
+import { useTestDatabase } from "./database-setup";
+useTestDatabase("migrations");
 
 test("upgrading an existing initial schema preserves expense values and adds equal split defaults", async () => {
   const db = await database();
-  // Recreate the previous schema state only inside this test process's in-memory database.
+  // Recreate the previous schema state only inside this process's isolated test database.
   await db.exec(
     "ALTER TABLE expenses DROP COLUMN split_mode; ALTER TABLE expenses DROP COLUMN original_amount; ALTER TABLE expenses DROP COLUMN original_currency; ALTER TABLE expenses DROP COLUMN exchange_rate; ALTER TABLE expense_shares DROP COLUMN percentage; DROP TABLE schema_migrations;",
   );

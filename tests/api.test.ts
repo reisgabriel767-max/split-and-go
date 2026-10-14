@@ -5,8 +5,8 @@ import { GET, POST } from "../src/app/api/groups/route";
 import type { GroupData } from "../src/lib/types";
 import { calculateBalances, planSettlement } from "../src/lib/settlement";
 
-Object.assign(process.env, { NODE_ENV: "test" });
-delete process.env.DATABASE_URL;
+import { useTestDatabase } from "./database-setup";
+useTestDatabase("api");
 
 function request(value: unknown, origin = "http://localhost:3000") {
   return new NextRequest("http://localhost:3000/api/groups", {

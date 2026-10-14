@@ -8,6 +8,8 @@
     "start": "next start --hostname 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test tests/*.test.ts",
+    "test:postgres": "node scripts/test-postgres.mjs",
+    "test:production": "node scripts/smoke-production.mjs",
     "format": "prettier --write src tests next.config.ts tsconfig.json package.json compose.yaml"
   },
   "dependencies": {

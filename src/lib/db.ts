@@ -41,6 +41,7 @@ async function connect(): Promise<Database> {
     const pool = new Pool({
       connectionString: process.env.DATABASE_URL,
       max: 5,
+      allowExitOnIdle: process.env.NODE_ENV === "test",
     });
     db = {
       async exec(sql: string) {
