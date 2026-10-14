@@ -23,7 +23,7 @@ As tarefas estao publicadas como [issues](https://github.com/reisgabriel767-max/
 
 ## ARCH-01 - Definir arquitetura
 
-Concluido: arquitetura e execucao local documentadas; testes passaram com PostgreSQL embarcado e PostgreSQL 18.4 externo. A aplicacao compilada tambem foi validada por HTTP contra o banco externo. O container Docker especifico ainda nao foi executado.
+Concluido: arquitetura e execucao documentadas; testes passaram com PostgreSQL embarcado, PostgreSQL 18.4 externo e container PostgreSQL 17 no GitHub Actions. A aplicacao compilada tambem foi validada por HTTP. O comando Compose local ainda nao foi executado.
 
 Criterios de aceite:
 - Stack e banco escolhidos com justificativa.

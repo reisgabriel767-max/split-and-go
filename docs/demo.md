@@ -27,6 +27,6 @@ Os exemplos da pasta local sao dados demonstrativos; nao representam pagamentos 
 - Abrir o quadro e as issues relacionadas aos commits.
 - Mostrar `git log --oneline` e explicar uma alteracao concreta em cada entrega.
 - Executar `npm test`, `npm run typecheck` e `npm run build`.
-- A suite foi validada com PostgreSQL 18.4 nativo e a aplicacao compilada. Para repetir, usar `SPLITGO_TEST_DATABASE_URL`, `npm run test:postgres` e `npm run test:production` apos o build. Validar o container Docker tambem se essa for a forma escolhida para a demonstracao.
+- A suite foi validada com PostgreSQL 18.4 nativo e container PostgreSQL 17 na CI, incluindo a aplicacao compilada. Para repetir, usar `SPLITGO_TEST_DATABASE_URL`, `npm run test:postgres` e `npm run test:production` apos o build. Conferir o Compose local tambem se essa for a forma escolhida para a demonstracao.
 - Disponibilizar acesso de leitura ao quadro aos avaliadores; ele esta privado por escolha do responsavel.
 - Reservar preparacao para o exercicio de logica de 10 minutos. Explicar os invariantes e os casos de borda do proprio codigo.

@@ -7,7 +7,7 @@ Data da verificacao: 14/10/2026.
 - Windows, Node.js 22.16.0 e Next.js 16.4.0.
 - PostgreSQL embarcado: PGlite, conforme package-lock.json.
 - PostgreSQL externo: 18.4 nativo, em instancia exclusiva de teste vinculada a 127.0.0.1:55432, com autenticacao por senha.
-- O Docker nao estava disponivel. A imagem PostgreSQL 17 do compose.yaml nao foi executada.
+- Docker nao estava disponivel localmente. PostgreSQL 17-alpine foi executado e validado como servico Docker no GitHub Actions, usando a mesma imagem indicada no Compose.
 
 ## Resultados
 
@@ -18,10 +18,13 @@ Data da verificacao: 14/10/2026.
 | `npm run typecheck` | Aprovado |
 | `npm run build` | Aprovado |
 | `npm run test:production` | Fluxo HTTP aprovado com servidor compilado e PostgreSQL externo |
+| GitHub Actions | Suite, build e teste HTTP aprovados com container PostgreSQL 17-alpine em Linux |
 | Interface | Grupos, despesas, moedas, extratos e acertos conferidos em desktop e celular na etapa anterior |
 | Limpeza | Nenhum esquema temporario de teste restante; instancia PostgreSQL de teste encerrada |
 
 O teste HTTP de producao verificou pagina inicial, cadastro de grupo e participantes, tres formas de rateio, conversao de USD para BRL, leitura posterior dos registros e rejeicao de uma cotacao invalida sem criar despesa adicional.
+
+A [execucao 38632541169](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38632541169) terminou com sucesso no commit `743dcd0`. O workflow inclui instalacao limpa com npm ci, os testes embarcados e externos, verificacao de tipos, build e teste HTTP de producao. Commits posteriores apenas de documentacao nao repetem essa suite automaticamente.
 
 ## Isolamento e repeticao
 
@@ -31,7 +34,7 @@ Os comandos de verificacao externa estao no README. A instancia usada nesta veri
 
 ## Limites que permanecem
 
-- O container Docker e o deploy em hospedagem nao foram testados.
+- O container PostgreSQL 17 foi testado na CI. O comando Compose local, sua persistencia em volume e um deploy em hospedagem nao foram testados.
 - A quantidade minima de transferencias e garantida para ate 20 participantes com saldo nao nulo. Para grupos maiores, a aplicacao identifica os planos cujo minimo nao foi comprovado como simplificados.
 - Cotacoes sao manuais e preservadas por despesa. Nao ha consulta automatica de mercado.
 - A demonstracao e local, sem contas de usuario, edicao ou exclusao de lancamentos e sem registro de pagamentos efetivos.

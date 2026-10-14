@@ -18,6 +18,7 @@
 - [x] Instrucoes de execucao local com scripts.
 - [x] Testes no PostgreSQL embarcado e externo.
 - [x] Build e verificacao HTTP da aplicacao compilada.
+- [x] Integracao continua aprovada com container PostgreSQL 17 no GitHub Actions.
 - [x] Quadro, issues e commits associados ao trabalho.
 
 ## Acoes antes de apresentar
@@ -29,7 +30,7 @@
 
 ## Complementos
 
-- [ ] Testar o container Docker, caso seja usado na demonstracao. O fluxo por scripts e PostgreSQL externo ja foi validado.
+- [ ] Executar o Compose local e conferir seu volume, caso essa seja a forma escolhida para a demonstracao. O container PostgreSQL 17 ja foi validado na CI.
 - [ ] Publicar uma demonstracao hospedada, entrega bonus prevista no case.
 
 ## Pontos para estudar
