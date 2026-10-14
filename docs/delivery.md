@@ -60,7 +60,7 @@ Nao ha link hospedado da aplicacao. O endereco 127.0.0.1 funciona apenas no comp
 ## Complementos
 
 - [ ] Executar o Compose local e conferir seu volume, caso essa seja a forma escolhida para a demonstracao. O container PostgreSQL 17 ja foi validado na CI.
-- [ ] Publicar uma demonstracao hospedada, entrega bonus prevista no case.
+- Deploy hospedado: bonus dispensado por decisao do responsavel. A entrega usara demonstracao local na videochamada; nao ha link publico da aplicacao.
 
 ## Pontos para estudar
 
