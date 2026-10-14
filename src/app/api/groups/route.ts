@@ -69,18 +69,24 @@ const input = z.union([createGroup, createMember, createExpense]);
 export async function GET() {
   try {
     const db = await database();
-    const data = await db.transaction(async (tx) => ({
-      groups: await tx.query("SELECT * FROM groups ORDER BY created_at, id"),
-      members: await tx.query(
-        "SELECT id, group_id, name FROM members ORDER BY created_at, id",
-      ),
-      expenses: await tx.query(
-        "SELECT id, group_id, payer_id, description, amount, split_mode, original_amount, original_currency, exchange_rate::text, to_char(spent_on, 'YYYY-MM-DD') AS spent_on FROM expenses ORDER BY spent_on DESC, created_at DESC, id",
-      ),
-      shares: await tx.query(
-        "SELECT expense_id, member_id, amount, percentage FROM expense_shares",
-      ),
-    }));
+    const data = await db.transaction(async (tx) => {
+      // All four collections must describe the same committed database snapshot.
+      await tx.exec(
+        "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+      );
+      return {
+        groups: await tx.query("SELECT * FROM groups ORDER BY created_at, id"),
+        members: await tx.query(
+          "SELECT id, group_id, name FROM members ORDER BY created_at, id",
+        ),
+        expenses: await tx.query(
+          "SELECT id, group_id, payer_id, description, amount, split_mode, original_amount, original_currency, exchange_rate::text, to_char(spent_on, 'YYYY-MM-DD') AS spent_on FROM expenses ORDER BY spent_on DESC, created_at DESC, id",
+        ),
+        shares: await tx.query(
+          "SELECT expense_id, member_id, amount, percentage FROM expense_shares",
+        ),
+      };
+    });
     return NextResponse.json(data);
   } catch (error) {
     console.error("Loading groups failed", error);

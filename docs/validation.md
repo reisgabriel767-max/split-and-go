@@ -2,6 +2,19 @@
 
 Data da verificacao: 14/10/2026.
 
+## Revalidacao de leitura concorrente
+
+Apos a verificacao original abaixo, o GET passou a usar `REPEATABLE READ READ ONLY`. Isso mantem as quatro colecoes da resposta no mesmo snapshot. A escolha segue a [documentacao de isolamento do PostgreSQL](https://www.postgresql.org/docs/17/transaction-iso.html).
+
+- `npm test`: 20 aprovados, um ignorado. O caso de duas conexoes exige PostgreSQL externo.
+- `npm run test:postgres`: 21 aprovados, incluindo cadastro de membro e despesa entre a leitura de membros e a leitura de despesas.
+- `npm run typecheck` e `npm run build`: aprovados.
+- `npm run test:production`: aprovado com o novo build.
+- PostgreSQL 18.4 em instancia temporaria exclusiva, vinculada a 127.0.0.1:55433, sem usar os dados da demonstracao. Nenhum esquema de testes restante e servidor encerrado apos a verificacao.
+- Essa ampliacao ainda nao foi enviada para a CI. A execucao remota citada abaixo representa a suite anterior de 19 testes.
+
+O build precisou executar fora do sandbox do Windows porque o Turbopack cria junctions. Os testes externos tambem precisaram de acesso a conexao local fora do sandbox. Essas restricoes nao exigiram alteracoes na configuracao do aplicativo.
+
 ## Ambiente observado
 
 - Windows, Node.js 22.16.0 e Next.js 16.4.0.

@@ -21,7 +21,7 @@ flowchart LR
     Browser --> Settlement[Saldos e plano de acerto no cliente]
 ```
 
-O navegador chama `GET/POST /api/groups`. O servidor valida os dados com Zod, converte a moeda em `src/lib/fx.ts` usando Decimal.js e calcula o rateio em `src/lib/money.ts`; a persistencia grava uma despesa e suas partes na mesma transacao. A interface deriva saldos, extratos e transferencias dos lancamentos e partes gravados usando `src/lib/settlement.ts`. Credenciais do banco ficam somente no servidor.
+O navegador chama `GET/POST /api/groups`. O servidor valida os dados com Zod, converte a moeda em `src/lib/fx.ts` usando Decimal.js e calcula o rateio em `src/lib/money.ts`; a persistencia grava uma despesa e suas partes na mesma transacao. O GET usa uma transacao somente de leitura com isolamento Repeatable Read, para retornar grupos, membros, despesas e partes do mesmo snapshot, mesmo com cadastros simultaneos. A interface deriva saldos, extratos e transferencias dos lancamentos e partes gravados usando `src/lib/settlement.ts`. Credenciais do banco ficam somente no servidor.
 
 O desenvolvimento local usa a aplicacao Node.js com PostgreSQL embarcado (PGlite) por padrao, sem Docker. Quando `DATABASE_URL` esta definida, a mesma camada de persistencia usa `pg` para conectar ao PostgreSQL externo; esse caminho foi validado com PostgreSQL 18.4 nativo e PostgreSQL 17 em container no GitHub Actions. `compose.yaml` usa a mesma imagem PostgreSQL 17, mas o comando Compose nao foi executado neste computador, que nao possui Docker disponivel. Producao exige `DATABASE_URL`; o fallback embarcado e restrito a desenvolvimento e testes. Filas e cache nao sao necessarios para este recorte.
 
@@ -119,7 +119,7 @@ npm run typecheck
 npm run build
 ```
 
-Os 19 testes cobrem rateios, cambio, historico, migracoes e plano de acerto, incluindo comparacao com busca exaustiva e o limite de 20 saldos ativos. A interface foi verificada em desktop e celular. A suite passou no PGlite, no PostgreSQL 18.4 externo e no container PostgreSQL 17 da CI; o teste HTTP da aplicacao compilada tambem passou. O comando Compose local, incluindo seu volume persistente, ainda nao foi executado.
+Os 21 testes cobrem rateios, cambio, historico, migracoes, plano de acerto e consistencia de leitura, incluindo comparacao com busca exaustiva e o limite de 20 saldos ativos. No PGlite, 20 passam e o teste de duas conexoes concorrentes fica ignorado; com PostgreSQL externo, os 21 passam. A interface foi verificada em desktop e celular. A suite original de 19 testes passou tambem no container PostgreSQL 17 da CI; a ampliacao de concorrencia foi validada localmente no PostgreSQL 18.4 e ainda nao foi enviada para uma nova execucao remota. O teste HTTP da aplicacao compilada passou novamente. O comando Compose local, incluindo seu volume persistente, ainda nao foi executado.
 
 ### Validacao com PostgreSQL externo
 
