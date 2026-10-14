@@ -7,6 +7,7 @@
 - Demonstracao local: http://127.0.0.1:3000 enquanto o servidor estiver em execucao.
 - Roteiro: [demo.md](demo.md).
 - Defesa tecnica: [defesa-tecnica.md](defesa-tecnica.md).
+- Slides editaveis: [apresentacao.pptx](apresentacao.pptx).
 - Gravacao: [gravacao.md](gravacao.md).
 - Treino de logica: [treino-logica.md](treino-logica.md).
 - Evidencias de verificacao: [validation.md](validation.md).
@@ -23,6 +24,7 @@
 - [x] Build e verificacao HTTP da aplicacao compilada.
 - [x] Integracao continua aprovada com container PostgreSQL 17 no GitHub Actions.
 - [x] Quadro, issues e commits associados ao trabalho.
+- [x] Slides editaveis e roteiros de demonstracao, defesa e treino de logica.
 
 ## Acoes antes de apresentar
 
@@ -39,6 +41,21 @@
 - [x] Publicar e confirmar a CI da mudanca de limite: [execucao 38650831945](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38650831945), commit 2bba1df. Os 23 testes externos, tipos, build e teste HTTP passaram.
 
 O documento solicita apresentacao em videochamada, nao um video gravado para entrega. gravacao.md e um recurso opcional de ensaio. O preparo dos materiais nao substitui a apresentacao pessoal nem o exercicio ao vivo.
+
+## Conferencia final
+
+Conferido em 14/10/2026: repositorio publico, branch main sincronizada, CI do ultimo codigo aprovada e demonstracao local respondendo HTTP 200. Os dados demonstrativos preservados contem um grupo, quatro membros, quatro despesas e treze partes, com total de R$ 172,57.
+
+Os slides em apresentacao.pptx refletem os 23 testes e o limite aprovado de 20 participantes. Antes da videochamada, abrir os links abaixo e conferir novamente o servidor, o microfone e o compartilhamento de tela.
+
+Links para fornecer aos avaliadores:
+
+- Codigo e instrucoes: https://github.com/reisgabriel767-max/split-and-go
+- Slides: https://github.com/reisgabriel767-max/split-and-go/blob/main/docs/apresentacao.pptx
+- Evidencia da CI: https://github.com/reisgabriel767-max/split-and-go/actions/runs/38650831945
+- Quadro: https://github.com/users/reisgabriel767-max/projects/1 (privado por decisao reafirmada do responsavel; nao atende ao requisito publico).
+
+Nao ha link hospedado da aplicacao. O endereco 127.0.0.1 funciona apenas no computador que executa o servidor. Nenhuma mensagem ou entrega foi enviada ao recrutamento.
 
 ## Complementos
 

@@ -139,6 +139,8 @@ Remove-Item Env:SPLITGO_TEST_DATABASE_URL
 
 Os resultados observados e as pendencias estao em [docs/validation.md](docs/validation.md); a lista de entrega esta em [docs/delivery.md](docs/delivery.md).
 
+Os materiais para a videochamada incluem [slides editaveis](docs/apresentacao.pptx), [roteiro de demonstracao](docs/demo.md), [defesa tecnica](docs/defesa-tecnica.md) e [treino de logica](docs/treino-logica.md). Os slides nao substituem a demonstracao ao vivo nem o entendimento do codigo pelo candidato.
+
 ### Integracao continua
 
 O workflow [Validate SplitGo](https://github.com/reisgabriel767-max/split-and-go/actions) repete os testes embarcados, os testes externos com container PostgreSQL 17, o build e o teste HTTP de producao. Ele executa em push e pull request com alteracoes de codigo, e pode ser iniciado manualmente. Alteracoes apenas no README ou em docs/ nao repetem a suite automaticamente. As actions oficiais estao fixadas por commit, com permissao de leitura do repositorio.
