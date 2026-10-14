@@ -26,10 +26,19 @@
 
 ## Acoes antes de apresentar
 
-- [ ] Disponibilizar o quadro para leitura dos avaliadores. A decisao atual e mante-lo privado.
+- [ ] Tornar o quadro publico conforme o case. A decisao atual e mante-lo privado, portanto este requisito ainda nao esta atendido.
 - [ ] Ensaiar a demonstracao e conferir a execucao local no dia.
 - [ ] Conseguir explicar o codigo, a arquitetura e as escolhas sem depender deste roteiro.
 - [ ] Preparar-se para o exercicio de logica de 10 minutos ao vivo.
+
+## Fechamento tecnico
+
+- [x] Publicar a correcao de concorrencia e os materiais de preparacao no GitHub.
+- [x] Confirmar a CI dessa versao: [execucao 38650341623](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38650341623), commit e6a5ace.
+- [x] Limitar criacao e ampliacao de grupos a 20 participantes, por decisao do responsavel. Dados legados maiores permanecem acessiveis.
+- [ ] Publicar e confirmar a CI da mudanca de limite.
+
+O documento solicita apresentacao em videochamada, nao um video gravado para entrega. gravacao.md e um recurso opcional de ensaio. O preparo dos materiais nao substitui a apresentacao pessoal nem o exercicio ao vivo.
 
 ## Complementos
 

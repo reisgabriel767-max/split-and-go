@@ -1,5 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { database } from "../src/lib/db";
 import { NextRequest } from "next/server";
 import { GET, POST } from "../src/app/api/groups/route";
 import type { GroupData } from "../src/lib/types";
@@ -7,6 +9,91 @@ import { calculateBalances, planSettlement } from "../src/lib/settlement";
 
 import { useTestDatabase } from "./database-setup";
 useTestDatabase("api");
+
+test("groups accept twenty members and reject creation or growth beyond that limit", async () => {
+  const value = {
+    action: "group",
+    name: "Limite",
+    currency: "BRL",
+    category: "trip",
+    members: Array.from({ length: 21 }, (_, i) => `Pessoa ${i + 1}`),
+  };
+  assert.equal((await POST(request(value))).status, 400);
+  const created = await POST(
+    request({ ...value, members: value.members.slice(0, 19) }),
+  );
+  assert.equal(created.status, 201);
+  const { id: groupId } = await created.json();
+  const attempts = await Promise.all([
+    POST(request({ action: "member", groupId, name: "Pessoa 20 A" })),
+    POST(request({ action: "member", groupId, name: "Pessoa 20 B" })),
+  ]);
+  assert.deepEqual(
+    attempts.map((response) => response.status).sort(),
+    [201, 400],
+  );
+  const rejected = await POST(
+    request({ action: "member", groupId, name: "Pessoa 21" }),
+  );
+  assert.equal(rejected.status, 400);
+  assert.match((await rejected.json()).error, /20 participantes/);
+  const data: GroupData = await (await GET()).json();
+  assert.equal(data.members.filter((m) => m.group_id === groupId).length, 20);
+  assert.equal(data.groups.filter((g) => g.name === "Limite").length, 1);
+});
+
+test("legacy groups above twenty members retain their data and expense support without growing", async () => {
+  const created = await POST(
+    request({
+      action: "group",
+      name: "Legado",
+      currency: "BRL",
+      category: "home",
+      members: Array.from({ length: 20 }, (_, i) => `Legado ${i + 1}`),
+    }),
+  );
+  assert.equal(created.status, 201);
+  const { id: groupId } = await created.json();
+  const db = await database();
+  await db.query("INSERT INTO members (id, group_id, name) VALUES ($1,$2,$3)", [
+    randomUUID(),
+    groupId,
+    "Legado 21",
+  ]);
+  let data: GroupData = await (await GET()).json();
+  const members = data.members.filter((m) => m.group_id === groupId);
+  assert.equal(members.length, 21);
+  assert.equal(
+    (await POST(request({ action: "member", groupId, name: "Legado 22" })))
+      .status,
+    400,
+  );
+  const saved = await POST(
+    request({
+      action: "expense",
+      groupId,
+      payerId: members[0].id,
+      description: "Historico preservado",
+      amount: 2100,
+      spentOn: "2026-10-14",
+      memberIds: members.map((m) => m.id),
+    }),
+  );
+  assert.equal(saved.status, 201);
+  const { id: expenseId } = await saved.json();
+  data = await (await GET()).json();
+  assert.equal(data.members.filter((m) => m.group_id === groupId).length, 21);
+  assert.equal(
+    data.shares.filter((s) => s.expense_id === expenseId).length,
+    21,
+  );
+  assert.equal(
+    data.shares
+      .filter((s) => s.expense_id === expenseId)
+      .reduce((sum, s) => sum + s.amount, 0),
+    2100,
+  );
+});
 
 function request(value: unknown, origin = "http://localhost:3000") {
   return new NextRequest("http://localhost:3000/api/groups", {
@@ -129,14 +216,20 @@ test("group-to-expense flow persists exact shares, enforces membership and rejec
     400,
   );
   state = await (await GET()).json();
-  assert.equal(state.expenses.length, 1);
+  assert.equal(
+    state.expenses.filter((e: { group_id: string }) => e.group_id === groupId)
+      .length,
+    1,
+  );
   assert.equal(
     (await POST(request({ action: "member", groupId, name: "Eva" }))).status,
     201,
   );
   state = await (await GET()).json();
   assert.equal(
-    state.shares.length,
+    state.shares.filter(
+      (s: { expense_id: string }) => s.expense_id === expenseId,
+    ).length,
     3,
     "new members must not change historical expense shares",
   );

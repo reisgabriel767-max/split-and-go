@@ -18,7 +18,7 @@ Os exemplos da pasta local sao dados demonstrativos; nao representam pagamentos 
 - `fx.ts`: Decimal.js multiplica o valor original pela taxa e arredonda half-up uma vez.
 - `route.ts`: valida dados e pertencimento ao grupo; grava despesa e partes em uma transacao.
 - `settlement.ts`: saldo e total pago menos total devido; o plano exato maximiza subconjuntos de soma zero para reduzir transferencias.
-- Limite do algoritmo: minimo global garantido ate 20 saldos ativos; grupos maiores usam simplificacao, sem promessa de minimo quando ele nao foi comprovado.
+- Escopo do MVP: novos grupos tem no maximo 20 membros, dentro da garantia de minimo global. Grupos legados maiores continuam acessiveis e podem usar simplificacao, sem promessa de minimo quando ele nao foi comprovado.
 - Persistencia: PostgreSQL embarcado em desenvolvimento sem Docker, PostgreSQL externo quando DATABASE_URL esta definida. Migracoes SQL preservam os dados existentes.
 - Cotacoes sao manuais neste MVP, sem feed de cambio. O historico nao e recalculado por taxas novas.
 

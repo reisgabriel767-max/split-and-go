@@ -5,6 +5,7 @@ import { database } from "@/lib/db";
 import { calculateSplit, SplitError } from "@/lib/money";
 import { convertMoney, CurrencyError } from "@/lib/fx";
 import type { Currency } from "@/lib/types";
+import { MAX_GROUP_MEMBERS } from "@/lib/limits";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ const createGroup = z
     name: z.string().trim().min(1).max(80),
     currency: z.enum(["BRL", "USD", "EUR"]),
     category: z.enum(["trip", "home", "event"]),
-    members: z.array(name).min(1).max(30),
+    members: z.array(name).min(1).max(MAX_GROUP_MEMBERS),
   })
   .refine(
     (data) =>
@@ -151,7 +152,8 @@ export async function POST(request: NextRequest) {
             "SELECT count(*) FROM members WHERE group_id=$1",
             [value.groupId],
           );
-          if (Number(count[0].count) >= 30) throw new Error("MEMBER_LIMIT");
+          if (Number(count[0].count) >= MAX_GROUP_MEMBERS)
+            throw new Error("MEMBER_LIMIT");
           await tx.query(
             "INSERT INTO members (id, group_id, name) VALUES ($1,$2,$3)",
             [id, value.groupId, value.name],
@@ -228,7 +230,7 @@ export async function POST(request: NextRequest) {
         {
           error:
             message === "MEMBER_LIMIT"
-              ? "O grupo atingiu o limite de 30 participantes."
+              ? `O grupo atingiu o limite de ${MAX_GROUP_MEMBERS} participantes.`
               : "Grupo ou participantes invalidos. Atualize a pagina.",
         },
         { status: 400 },

@@ -6,7 +6,7 @@ MVP para organizar despesas de grupos, calcular saldos individuais e sugerir um 
 
 Fluxo implementado com Next.js 16, React 19, TypeScript e PostgreSQL: grupos, participantes, tres tipos de rateio, conversao de moedas com cotacao registrada, saldos, extratos e plano de acerto. Os dados persistem entre recargas.
 
-O MVP suporta BRL, USD e EUR. A cotacao e manual, e o minimo global de transferencias e garantido para ate 20 participantes com saldo diferente de zero; veja os limites abaixo. Nao ha autenticacao, edicao ou exclusao de lancamentos; o ambiente atual e uma demonstracao local. Os testes passaram no PostgreSQL embarcado, no PostgreSQL 18 externo e no container PostgreSQL 17 da CI, incluindo a aplicacao compilada. A apresentacao e o acesso dos avaliadores ao quadro ainda precisam ser preparados.
+O MVP suporta BRL, USD e EUR. A cotacao e manual. Novos grupos e inclusoes de membros respeitam o limite de 20 participantes, dentro da garantia de minimo global de transferencias. Grupos legados maiores permanecem acessiveis, com a ressalva descrita abaixo. Nao ha autenticacao, edicao ou exclusao de lancamentos; o ambiente atual e uma demonstracao local. Os testes passaram no PostgreSQL embarcado, no PostgreSQL 18 externo e no container PostgreSQL 17 da CI, incluindo a aplicacao compilada. Os materiais de apresentacao estao preparados; o ensaio, a videochamada e o acesso publico ao quadro continuam pendentes.
 
 ## Arquitetura proposta
 
@@ -53,7 +53,9 @@ O plano elimina cadeias de divida a partir dos saldos liquidos. Primeiro, calcul
 
 Nos demais casos com ate 20 saldos nao nulos, programacao dinamica por subconjuntos encontra a maior quantidade de componentes com soma zero. Cada componente de tamanho `k` precisa de `k - 1` transferencias; maximizar esses componentes minimiza o total global. Depois, o algoritmo reconstrui os componentes e as transferencias. Complexidade: tempo `O(n * 2^n)` e memoria `O(2^n)`, com desempates estaveis por identificador.
 
-Acima de 20 saldos nao nulos, a aplicacao usa o plano guloso, limitado a `n - 1` transferencias. Se o limite inferior nao comprovar o minimo, a tela mostra **Plano simplificado**, sem afirmar otimalidade. Esse limite permite grupos de ate 30 membros sem uma busca exponencial descontrolada no navegador, mas nao garante o minimo global em todos os grupos grandes. E uma decisao explicita de escopo a defender na avaliacao. O plano e uma sugestao; o aplicativo nao efetua nem registra pagamentos reais.
+O cadastro de novos grupos e a adicao de participantes limitam o MVP a 20 membros. Assim, todo grupo criado nesse escopo fica dentro da garantia de minimo global. O limite e validado no servidor, inclusive quando duas inclusoes chegam ao mesmo tempo, e exibido na interface.
+
+Grupos legados com mais de 20 membros nao sao excluidos nem truncados. Eles continuam permitindo consulta e lancamentos com ate 30 participantes, mas nao podem receber novos membros. Acima de 20 saldos nao nulos, a aplicacao usa o plano guloso, limitado a `n - 1` transferencias. Se o limite inferior nao comprovar o minimo, a tela mostra **Plano simplificado**, sem afirmar otimalidade. Essa compatibilidade nao amplia a garantia dos novos grupos. O plano e uma sugestao; o aplicativo nao efetua nem registra pagamentos reais.
 
 Os testes comparam planos pequenos a uma busca exaustiva independente e incluem um caso em que o guloso gera cinco transferencias, mas o algoritmo exato encontra quatro, alem de um grupo no limite de 20 saldos.
 
@@ -119,7 +121,7 @@ npm run typecheck
 npm run build
 ```
 
-Os 21 testes cobrem rateios, cambio, historico, migracoes, plano de acerto e consistencia de leitura, incluindo comparacao com busca exaustiva e o limite de 20 saldos ativos. No PGlite, 20 passam e o teste de duas conexoes concorrentes fica ignorado; com PostgreSQL externo, os 21 passam. A interface foi verificada em desktop e celular. A suite original de 19 testes passou tambem no container PostgreSQL 17 da CI; a ampliacao de concorrencia foi validada localmente no PostgreSQL 18.4 e ainda nao foi enviada para uma nova execucao remota. O teste HTTP da aplicacao compilada passou novamente. O comando Compose local, incluindo seu volume persistente, ainda nao foi executado.
+Os 23 testes cobrem rateios, cambio, historico, migracoes, plano de acerto, consistencia de leitura e limite de membros, incluindo compatibilidade com grupos legados maiores. No PGlite, 22 passam e o teste de duas conexoes concorrentes fica ignorado. A suite anterior de 21 testes passou no PostgreSQL externo e na CI com container PostgreSQL 17, incluindo o fluxo HTTP compilado. A ampliacao para o limite de membros ainda aguarda sua execucao remota. A interface foi verificada em desktop e celular; a rejeicao de um grupo com 21 nomes tambem foi conferida no navegador. O comando Compose local, incluindo seu volume persistente, ainda nao foi executado.
 
 ### Validacao com PostgreSQL externo
 

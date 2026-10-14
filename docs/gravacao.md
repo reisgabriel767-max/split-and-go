@@ -1,6 +1,6 @@
 # Roteiro de gravacao
 
-Sugestao de ensaio de 8 a 10 minutos. O tempo do video deve seguir o combinado com os avaliadores; este roteiro nao estabelece uma exigencia do case.
+Recurso opcional para ensaiar a apresentacao em videochamada pedida pelo case. O documento original nao exige entrega de video gravado. A duracao de 8 a 10 minutos abaixo e apenas uma sugestao de ensaio, a ajustar ao tempo combinado com os avaliadores.
 
 ## Preparacao
 
@@ -55,6 +55,6 @@ Os tempos sao referencias de ensaio. Uma demonstracao clara pode levar mais temp
 
 - Ouvir o video inteiro e conferir se o codigo esta legivel.
 - Remover trechos com informacoes sensiveis caso aparecam acidentalmente.
-- Conferir se o link do video funciona para o destinatario, segundo a forma de entrega combinada.
+- Compartilhar uma gravacao apenas se isso for solicitado ou combinado com os avaliadores.
 - Conferir os links do repositorio e o acesso de leitura ao quadro.
-- Nao considerar a gravacao concluida apenas porque este roteiro existe. A gravacao e o envio continuam pendentes.
+- Conferir camera, microfone e compartilhamento de tela antes da videochamada. A apresentacao ao vivo continua pendente.

@@ -53,6 +53,7 @@ import CurrencyFields from "@/components/currency-fields";
 import SettlementPanel from "@/components/settlement-panel";
 import { convertMoney, moneyInput } from "@/lib/fx";
 import { calculateBalances, planSettlement } from "@/lib/settlement";
+import { MAX_GROUP_MEMBERS } from "@/lib/limits";
 
 const categories = {
   trip: {
@@ -255,6 +256,10 @@ export default function Workspace() {
           .filter(Boolean);
         if (!names.length)
           throw new Error("Adicione pelo menos um participante.");
+        if (names.length > MAX_GROUP_MEMBERS)
+          throw new Error(
+            `O grupo pode ter ate ${MAX_GROUP_MEMBERS} participantes.`,
+          );
         if (new Set(names.map((n) => n.toLowerCase())).size !== names.length)
           throw new Error("Use um nome diferente para cada participante.");
         payload = {
@@ -574,6 +579,14 @@ export default function Workspace() {
                 <button
                   className="button primary"
                   onClick={() => open(tab === "members" ? "member" : "expense")}
+                  disabled={
+                    tab === "members" && members.length >= MAX_GROUP_MEMBERS
+                  }
+                  title={
+                    tab === "members" && members.length >= MAX_GROUP_MEMBERS
+                      ? `Limite de ${MAX_GROUP_MEMBERS} participantes atingido`
+                      : undefined
+                  }
                 >
                   <Plus size={16} />
                   {tab === "members" ? "Participante" : "Nova despesa"}
@@ -793,7 +806,9 @@ export default function Workspace() {
                     <div className="balance-heading">
                       <h3>Quem faz parte</h3>
                       <span className="muted">
-                        {members.length} de 30 participantes
+                        {members.length > MAX_GROUP_MEMBERS
+                          ? `${members.length} participantes (grupo legado)`
+                          : `${members.length} de ${MAX_GROUP_MEMBERS} participantes`}
                       </span>
                     </div>
                     {members.map((member, index) => (
@@ -878,7 +893,7 @@ export default function Workspace() {
                   </select>
                 </label>
                 <label>
-                  Participantes
+                  Participantes (ate {MAX_GROUP_MEMBERS})
                   <textarea
                     name="members"
                     placeholder="Ana, Bruno, Carla"

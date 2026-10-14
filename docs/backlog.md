@@ -60,7 +60,7 @@ Criterios de aceite:
 
 ## BALANCE-01 - Calcular saldos e plano de acerto
 
-Implementado: saldos e plano de acerto. Minimo global verificado ate 20 saldos nao nulos, com fallback guloso explicitamente identificado para grupos maiores. Testes comparam o algoritmo exato com uma busca exaustiva independente. O limite de otimalidade para grupos grandes esta registrado no README para a avaliacao.
+Implementado: saldos e plano de acerto. Novos grupos e inclusoes limitados a 20 participantes, dentro da garantia de minimo global. Grupos legados maiores permanecem acessiveis, com fallback guloso explicitamente identificado quando nao ha prova de minimo. Testes comparam o algoritmo exato com uma busca exaustiva independente e verificam o limite de membros e a preservacao dos legados.
 
 Criterios de aceite:
 - Exibir total pago, participacao nas despesas e saldo por participante.

@@ -11,7 +11,16 @@ Apos a verificacao original abaixo, o GET passou a usar `REPEATABLE READ READ ON
 - `npm run typecheck` e `npm run build`: aprovados.
 - `npm run test:production`: aprovado com o novo build.
 - PostgreSQL 18.4 em instancia temporaria exclusiva, vinculada a 127.0.0.1:55433, sem usar os dados da demonstracao. Nenhum esquema de testes restante e servidor encerrado apos a verificacao.
-- Essa ampliacao ainda nao foi enviada para a CI. A execucao remota citada abaixo representa a suite anterior de 19 testes.
+- A ampliacao foi enviada e passou na [execucao 38650341623](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38650341623), commit e6a5ace: testes embarcados e externos, tipos, build e fluxo HTTP compilado aprovados. A execucao antiga citada abaixo representa a suite original de 19 testes.
+
+## Limite do MVP
+
+Por decisao do responsavel, novos grupos e inclusoes posteriores ficam limitados a 20 participantes. Grupos legados maiores conservam consulta e suporte a despesas, sem novos membros. Os testes verificam criacao acima do limite, inclusao do vigesimo membro, rejeicao do vigesimo primeiro e preservacao de um grupo legado com 21 membros.
+
+- Suite ampliada: 22 testes aprovados no PGlite, um caso de concorrencia ignorado por exigir PostgreSQL externo.
+- Build com verificacao de tipos aprovado.
+- Navegador: cadastro com 21 nomes rejeitado sem criar grupo. Dados demonstrativos anteriores preservados.
+- CI desta ampliacao ainda pendente de publicacao.
 
 O build precisou executar fora do sandbox do Windows porque o Turbopack cria junctions. Os testes externos tambem precisaram de acesso a conexao local fora do sandbox. Essas restricoes nao exigiram alteracoes na configuracao do aplicativo.
 
