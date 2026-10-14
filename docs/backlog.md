@@ -51,6 +51,8 @@ Criterios de aceite:
 
 ## FX-01 - Definir conversao de moedas
 
+Concluido: moeda original, cotacao manual de ate seis casas e total convertido persistidos. Conversao decimal half-up antes do rateio, com validacao de taxas e preservacao do historico.
+
 Criterios de aceite:
 - Registrar a taxa usada em cada despesa estrangeira.
 - Manter o valor original e o valor convertido.
@@ -58,7 +60,7 @@ Criterios de aceite:
 
 ## BALANCE-01 - Calcular saldos e plano de acerto
 
-Andamento: saldos individuais calculados a partir dos pagamentos e partes persistidos. O plano otimizado de acerto ainda nao foi implementado.
+Implementado: saldos e plano de acerto. Minimo global verificado ate 20 saldos nao nulos, com fallback guloso explicitamente identificado para grupos maiores. Testes comparam o algoritmo exato com uma busca exaustiva independente. O limite de otimalidade para grupos grandes esta registrado no README para a avaliacao.
 
 Criterios de aceite:
 - Exibir total pago, participacao nas despesas e saldo por participante.
@@ -70,7 +72,7 @@ Criterios de aceite:
 
 ## PANEL-01 - Exibir extratos e fechamento
 
-Andamento: despesas, participantes, saldos e extratos individuais implementados, com layout verificado em desktop e celular. Falta o plano de acerto.
+Concluido: despesas, participantes, saldos, extratos e aba Acerto com devedores, credores e valores na moeda base. Layout verificado em desktop e celular.
 
 Criterios de aceite:
 - Exibir despesas e extrato de cada participante.

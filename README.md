@@ -4,9 +4,9 @@ MVP para organizar despesas de grupos, calcular saldos individuais e sugerir um 
 
 ## Status
 
-Fluxo implementado com Next.js 16, React 19, TypeScript e PostgreSQL: criar grupos, cadastrar participantes, registrar despesas com rateio igualitario, percentual ou por valor fixo, consultar saldos e extratos individuais. Os dados persistem entre recargas.
+Fluxo implementado com Next.js 16, React 19, TypeScript e PostgreSQL: grupos, participantes, tres tipos de rateio, conversao de moedas com cotacao registrada, saldos, extratos e plano de acerto. Os dados persistem entre recargas.
 
-Ainda faltam conversao entre moedas e plano otimizado de transferencias. Nesta etapa, cada despesa usa a moeda base do grupo (BRL, USD ou EUR). Nao ha autenticacao, edicao ou exclusao de lancamentos; o ambiente atual e uma demonstracao local.
+O MVP suporta BRL, USD e EUR. A cotacao e manual, e o minimo global de transferencias e garantido para ate 20 participantes com saldo diferente de zero; veja os limites abaixo. Nao ha autenticacao, edicao ou exclusao de lancamentos; o ambiente atual e uma demonstracao local. A validacao com PostgreSQL via Docker e o acesso dos avaliadores ao quadro continuam pendentes.
 
 ## Arquitetura proposta
 
@@ -15,16 +15,17 @@ Uma aplicacao fullstack evita manter dois projetos e dois deployments no MVP. Ne
 ```mermaid
 flowchart LR
     Browser[Navegador - React] --> App[Next.js - interface e endpoints]
-    App --> Domain[Regras de rateio, moedas e saldos]
+    App --> Domain[Conversao e rateio no servidor]
     Domain --> Data[Camada de persistencia]
     Data --> DB[(PostgreSQL)]
+    Browser --> Settlement[Saldos e plano de acerto no cliente]
 ```
 
-O navegador chama `GET/POST /api/groups`. O servidor valida os dados com Zod e calcula o rateio em `src/lib/money.ts`; a persistencia grava uma despesa e suas partes na mesma transacao. A interface deriva saldos e extratos dos lancamentos e partes gravados. Credenciais do banco ficam somente no servidor.
+O navegador chama `GET/POST /api/groups`. O servidor valida os dados com Zod, converte a moeda em `src/lib/fx.ts` usando Decimal.js e calcula o rateio em `src/lib/money.ts`; a persistencia grava uma despesa e suas partes na mesma transacao. A interface deriva saldos, extratos e transferencias dos lancamentos e partes gravados usando `src/lib/settlement.ts`. Credenciais do banco ficam somente no servidor.
 
 O desenvolvimento local usa a aplicacao Node.js com PostgreSQL embarcado (PGlite) por padrao, sem Docker. Quando `DATABASE_URL` esta definida, a mesma camada de persistencia usa `pg` para conectar ao PostgreSQL externo. `compose.yaml` prepara esse banco; esse caminho ainda nao foi executado neste computador, que nao possui Docker disponivel. Producao exige `DATABASE_URL`; o fallback embarcado e restrito a desenvolvimento e testes. O deploy sera definido depois da implementacao. Filas e cache nao sao necessarios para este recorte.
 
-### Modelo de dados previsto
+### Modelo de dados
 
 - `Group`: nome e moeda base.
 - `Member`: nome e grupo ao qual pertence.
@@ -35,9 +36,10 @@ O pagador e todos os participantes de uma despesa devem pertencer ao grupo. Um m
 
 ### Regras financeiras
 
-- Valores monetarios serao inteiros em unidades minimas da moeda, sem calculos financeiros com ponto flutuante binario.
+- Valores monetarios sao inteiros em unidades minimas da moeda, sem calculos financeiros com ponto flutuante binario.
 - O primeiro recorte suporta BRL, USD e EUR, todas com duas casas decimais.
 - Cada despesa registra a taxa manual usada na conversao para a moeda base. A taxa representa unidades da moeda base por uma unidade da moeda original; despesas na moeda base usam taxa 1.
+- Taxas aceitam ate seis casas decimais e devem ser positivas. A despesa preserva `original_amount`, `original_currency` e `exchange_rate`; `amount` e o total convertido. O mesmo registro guarda a data da despesa e o instante da criacao. Taxas futuras nao alteram registros anteriores.
 - A conversao usa aritmetica decimal e arredondamento half-up uma unica vez. O rateio opera sobre o total convertido.
 - No rateio igualitario ou percentual, centavos restantes sao distribuidos pelo metodo dos maiores restos, com desempate por identificador estavel do participante. Percentuais sao expressos em pontos-base e devem somar 10.000 (100%).
 - Valores fixos sao informados na moeda base e devem somar exatamente o total convertido.
@@ -47,13 +49,17 @@ O pagador e todos os participantes de uma despesa devem pertencer ao grupo. Um m
 
 ### Plano de acerto
 
-A implementacao inicial separara credores e devedores e combinara os maiores saldos, transferindo o menor valor entre cada par ate zerar todos os saldos. Isso elimina cadeias de dividas e produz no maximo `n - 1` transferencias para `n` participantes com saldo diferente de zero.
+O plano elimina cadeias de divida a partir dos saldos liquidos. Primeiro, calcula uma solucao gulosa entre credores e devedores. Se a quantidade encontrada ja coincide com o limite inferior `max(numero de credores, numero de devedores)`, o minimo esta comprovado.
 
-Essa estrategia gulosa nao garante o minimo global de transferencias para todos os conjuntos de saldos. O case pede minimizacao; antes de concluir essa tarefa, sera necessario implementar uma busca exata para grupos pequenos ou registrar e justificar uma decisao de escopo que atenda a avaliacao. A tarefa permanece aberta no backlog.
+Nos demais casos com ate 20 saldos nao nulos, programacao dinamica por subconjuntos encontra a maior quantidade de componentes com soma zero. Cada componente de tamanho `k` precisa de `k - 1` transferencias; maximizar esses componentes minimiza o total global. Depois, o algoritmo reconstrui os componentes e as transferencias. Complexidade: tempo `O(n * 2^n)` e memoria `O(2^n)`, com desempates estaveis por identificador.
+
+Acima de 20 saldos nao nulos, a aplicacao usa o plano guloso, limitado a `n - 1` transferencias. Se o limite inferior nao comprovar o minimo, a tela mostra **Plano simplificado**, sem afirmar otimalidade. Esse limite permite grupos de ate 30 membros sem uma busca exponencial descontrolada no navegador, mas nao garante o minimo global em todos os grupos grandes. E uma decisao explicita de escopo a defender na avaliacao. O plano e uma sugestao; o aplicativo nao efetua nem registra pagamentos reais.
+
+Os testes comparam planos pequenos a uma busca exaustiva independente e incluem um caso em que o guloso gera cinco transferencias, mas o algoritmo exato encontra quatro, alem de um grupo no limite de 20 saldos.
 
 ### Casos de borda
 
-| Caso | Tratamento previsto |
+| Caso | Tratamento implementado |
 | --- | --- |
 | R$ 10,00 divididos entre tres pessoas | Distribuir 334, 333 e 333 centavos com desempate estavel. |
 | Percentuais diferentes de 100% ou valores fixos inconsistentes | Rejeitar a despesa e mostrar a diferenca antes de salvar. |
@@ -133,13 +139,21 @@ Em `POST /api/groups`, uma despesa recebe `memberIds` e um campo `split`:
 
 O campo `value` usa pontos-base no modo `percentage` (6000 = 60%) e centavos no modo `fixed`. As partes devem corresponder exatamente aos `memberIds`, sem faltantes, extras ou repeticoes. O modo `equal` usa apenas `{ "mode": "equal" }`. Omitir `split` mantem a compatibilidade com o fluxo inicial e assume divisao igualitaria. Os exemplos de identificadores acima sao ilustrativos; envie UUIDs reais do grupo.
 
+Para cambio, envie `currency` com a moeda original e `exchangeRate` como texto decimal, por exemplo `"5.25"`. `amount` no pedido continua em centavos da moeda original: USD 10,01 usa `amount: 1001`; em um grupo BRL, a taxa 5,25 produz `amount: 5255` na resposta persistida, com `original_amount: 1001`. As partes fixas do pedido sempre usam centavos da moeda base. Omitir `currency` assume a moeda do grupo e taxa 1; despesas estrangeiras exigem cotacao explicita.
+
 ### Estrutura
 
 - `src/app`: interface e endpoints Next.js.
 - `src/components/workspace.tsx`: grupos, formularios, despesas e extratos.
 - `src/lib/money.ts`: parse monetario e rateio em centavos.
+- `src/lib/fx.ts`: conversao decimal, validacao de taxas e arredondamento.
+- `src/lib/settlement.ts`: saldos e plano de acerto.
 - `src/lib/db.ts`: conexao e transacoes com PGlite ou PostgreSQL.
 - `db/001_initial.sql`: tabelas, chaves estrangeiras e restricoes.
 - `tests`: testes de dominio e integracao dos endpoints com PostgreSQL embarcado.
 
 As fotografias de capa sao carregadas do Unsplash; a funcionalidade dos grupos nao depende delas.
+
+## Demonstracao
+
+O roteiro em [docs/demo.md](docs/demo.md) organiza a apresentacao do produto e a explicacao das decisoes tecnicas. Antes de entregar, valide o caminho Docker, revise o quadro e prepare a explicacao do codigo e o exercicio de logica ao vivo.
