@@ -1,13 +1,25 @@
 # Backlog inicial
 
-Este arquivo prepara as tarefas para o quadro de acompanhamento. Ainda nao representa um quadro publicado no GitHub Projects.
+As tarefas estao publicadas como [issues](https://github.com/reisgabriel767-max/split-and-go/issues) e vinculadas ao [quadro Split&Go - MVP](https://github.com/users/reisgabriel767-max/projects/1), atualmente privado por decisao do responsavel. O acesso aos avaliadores permanece pendente para a entrega.
+
+| Tarefa | Issue |
+| --- | --- |
+| SETUP-01 | [#8](https://github.com/reisgabriel767-max/split-and-go/issues/8) |
+| ARCH-01 | [#1](https://github.com/reisgabriel767-max/split-and-go/issues/1) |
+| GROUP-01 | [#2](https://github.com/reisgabriel767-max/split-and-go/issues/2) |
+| EXPENSE-01 | [#3](https://github.com/reisgabriel767-max/split-and-go/issues/3) |
+| FX-01 | [#4](https://github.com/reisgabriel767-max/split-and-go/issues/4) |
+| BALANCE-01 | [#5](https://github.com/reisgabriel767-max/split-and-go/issues/5) |
+| PANEL-01 | [#6](https://github.com/reisgabriel767-max/split-and-go/issues/6) |
+| DELIVERY-01 | [#7](https://github.com/reisgabriel767-max/split-and-go/issues/7) |
 
 ## SETUP-01 - Preparar repositorio e quadro
 
 - [x] Criar README, backlog e .gitignore.
-- [ ] Publicar o repositorio no GitHub.
-- [ ] Criar quadro com Backlog, In Progress, In Review, Testing e Done.
-- [ ] Transferir as tarefas para issues e vincular ao quadro.
+- [x] Publicar o repositorio no GitHub.
+- [x] Criar quadro com Backlog, In Progress, In Review, Testing e Done.
+- [x] Transferir as tarefas para issues e vincular ao quadro.
+- [ ] Disponibilizar acesso de leitura ao quadro para os avaliadores antes da entrega.
 
 ## ARCH-01 - Definir arquitetura
 
@@ -45,6 +57,7 @@ Criterios de aceite:
 - Garantir que a soma dos saldos do grupo seja zero.
 - Sugerir transferencias que quitem todos os saldos.
 - Documentar a estrategia de reducao de transferencias e seus limites.
+- Atender ao requisito de minimizacao: avaliar busca exata para grupos pequenos e limites de complexidade antes de concluir a tarefa.
 - Verificar casos com saldo zero, centavos e varias moedas.
 
 ## PANEL-01 - Exibir extratos e fechamento
