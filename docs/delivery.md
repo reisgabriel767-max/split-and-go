@@ -6,6 +6,9 @@
 - Quadro: https://github.com/users/reisgabriel767-max/projects/1 (atualmente privado).
 - Demonstracao local: http://127.0.0.1:3000 enquanto o servidor estiver em execucao.
 - Roteiro: [demo.md](demo.md).
+- Defesa tecnica: [defesa-tecnica.md](defesa-tecnica.md).
+- Gravacao: [gravacao.md](gravacao.md).
+- Treino de logica: [treino-logica.md](treino-logica.md).
 - Evidencias de verificacao: [validation.md](validation.md).
 
 ## Pronto no repositorio
@@ -40,4 +43,4 @@
 - Como a transacao evita gravar uma despesa sem todas as partes.
 - Por que saldos devem somar zero e como o plano os quita.
 - Como os subconjuntos de soma zero minimizam transferencias e por que a busca tem limite de tamanho.
-- O que muda entre PostgreSQL embarcado, externo e o container ainda nao testado.
+- O que muda entre PostgreSQL embarcado, externo e o container validado na CI. O Compose local ainda precisa de verificacao se for usado na demonstracao.
