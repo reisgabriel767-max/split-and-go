@@ -61,6 +61,7 @@ const createExpense = z
     "Participantes repetidos.",
   );
 export const groupInput = z.union([createGroup, createMember, createExpense]);
+export const deleteGroupInput = z.object({ groupId: z.uuid() }).strict();
 
 export function isSameOrigin(request: NextRequest) {
   const origin = request.headers.get("origin");
@@ -72,8 +73,11 @@ export function isSameOrigin(request: NextRequest) {
   }
 }
 
-export function groupErrorResponse(error: unknown, operation: "load" | "save") {
-  if (operation === "save") {
+export function groupErrorResponse(
+  error: unknown,
+  operation: "load" | "save" | "delete",
+) {
+  if (operation !== "load") {
     if (error instanceof SplitError || error instanceof CurrencyError)
       return NextResponse.json({ error: error.message }, { status: 400 });
     if (error instanceof ApplicationError) {
@@ -92,7 +96,11 @@ export function groupErrorResponse(error: unknown, operation: "load" | "save") {
     }
   }
   console.error(
-    operation === "load" ? "Loading groups failed" : "Saving group data failed",
+    operation === "load"
+      ? "Loading groups failed"
+      : operation === "delete"
+        ? "Deleting group failed"
+        : "Saving group data failed",
     error,
   );
   return NextResponse.json(
@@ -100,7 +108,9 @@ export function groupErrorResponse(error: unknown, operation: "load" | "save") {
       error:
         operation === "load"
           ? "Nao foi possivel carregar os grupos. Tente novamente."
-          : "Nao foi possivel salvar. Tente novamente.",
+          : operation === "delete"
+            ? "Nao foi possivel excluir o grupo. Tente novamente."
+            : "Nao foi possivel salvar. Tente novamente.",
     },
     { status: 503 },
   );

@@ -36,6 +36,7 @@ export interface GroupTransaction {
   countMembers(groupId: string): Promise<number>;
   memberIds(groupId: string): Promise<string[]>;
   insertExpense(expense: ExpenseRecord, shares: SplitShare[]): Promise<void>;
+  deleteGroup(groupId: string): Promise<void>;
 }
 
 export interface GroupRepository {

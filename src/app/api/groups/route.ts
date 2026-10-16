@@ -5,6 +5,7 @@ import { database } from "@/infrastructure/database";
 import { SqlGroupRepository } from "@/infrastructure/sql-group-repository";
 import {
   groupInput,
+  deleteGroupInput,
   groupErrorResponse,
   isSameOrigin,
 } from "@/presentation/groups-http";
@@ -23,6 +24,32 @@ export async function GET() {
     return NextResponse.json(await groups.getGroupsSnapshot());
   } catch (error) {
     return groupErrorResponse(error, "load");
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  if (!isSameOrigin(request))
+    return NextResponse.json(
+      { error: "Origem da requisicao invalida." },
+      { status: 403 },
+    );
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Dados invalidos." }, { status: 400 });
+  }
+  const parsed = deleteGroupInput.safeParse(raw);
+  if (!parsed.success)
+    return NextResponse.json(
+      { error: "Informe um grupo valido para exclusao." },
+      { status: 400 },
+    );
+  try {
+    await groups.deleteGroup(parsed.data.groupId);
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    return groupErrorResponse(error, "delete");
   }
 }
 

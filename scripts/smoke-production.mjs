@@ -183,8 +183,30 @@ try {
   });
   assert.equal(invalid.status, 400);
   assert.equal((await load()).expenses.length, 3);
+  const { id: otherGroup } = await post({
+    action: "group",
+    name: "Preservar na exclusao",
+    currency: "BRL",
+    category: "home",
+    members: ["Diego"],
+  });
+  const remove = () =>
+    fetch(`${base}/api/groups`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Origin: base },
+      body: JSON.stringify({ groupId }),
+    });
+  assert.equal((await remove()).status, 204);
+  const remaining = await load();
+  assert.equal(remaining.groups.length, 1);
+  assert.equal(remaining.groups[0].id, otherGroup);
+  assert.equal(remaining.members.length, 1);
+  assert.equal(remaining.members[0].group_id, otherGroup);
+  assert.equal(remaining.expenses.length, 0);
+  assert.equal(remaining.shares.length, 0);
+  assert.equal((await remove()).status, 204);
   console.log(
-    "Production HTTP smoke passed: page, groups, three splits, currency history, persistence and invalid-input rejection.",
+    "Production HTTP smoke passed: page, groups, three splits, currency history, persistence, invalid-input rejection and isolated group deletion.",
   );
 } finally {
   if (child && !serverExited) {

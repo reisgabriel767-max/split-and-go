@@ -1,6 +1,6 @@
 # Backlog inicial
 
-As tarefas estao publicadas como [issues](https://github.com/reisgabriel767-max/split-and-go/issues) e vinculadas ao [quadro Split&Go - MVP](https://github.com/users/reisgabriel767-max/projects/1), atualmente privado por decisao do responsavel. O acesso aos avaliadores permanece pendente para a entrega.
+As tarefas estao publicadas como [issues](https://github.com/reisgabriel767-max/split-and-go/issues) e vinculadas ao [quadro publico Split&Go - MVP](https://github.com/users/reisgabriel767-max/projects/1). A leitura e publica; edicao e administracao permanecem restritas as permissoes existentes.
 
 | Tarefa | Issue |
 | --- | --- |
@@ -81,7 +81,7 @@ Criterios de aceite:
 
 ## DELIVERY-01 - Preparar entrega
 
-Andamento: roteiro de demonstracao, relatorio de validacao e checklist de entrega publicados em docs/. Faltam a preparacao pessoal para a apresentacao e a disponibilizacao do quadro aos avaliadores. Deploy permanece opcional.
+Andamento: slides, relatorio de validacao e matriz de aderencia disponiveis em docs/. O quadro permite leitura publica. A apresentacao ao vivo permanece pendente. Deploy e opcional.
 
 Criterios de aceite:
 - Documentar pelo menos tres casos de borda.

@@ -37,6 +37,11 @@ export function createGroupUseCases(
 ) {
   return {
     getGroupsSnapshot: () => repository.getSnapshot(),
+    async deleteGroup(groupId: string) {
+      return repository.transaction(async (tx) => {
+        if (await tx.lockGroup(groupId)) await tx.deleteGroup(groupId);
+      });
+    },
     async createGroup(input: CreateGroupInput) {
       if (
         !input.members.length ||

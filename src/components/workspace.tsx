@@ -14,6 +14,7 @@ import {
   RefreshCw,
   Sparkles,
   TentTree,
+  Trash2,
   Users,
   Wallet,
   X,
@@ -26,6 +27,7 @@ import { moneyInput } from "@/lib/fx";
 import useWorkspace from "@/hooks/use-workspace";
 import GroupPanels, { Avatar } from "@/components/group-panels";
 import { MAX_GROUP_MEMBERS } from "@/lib/limits";
+import DeleteGroupConfirmation from "@/components/delete-group-confirmation";
 
 const categories = {
   trip: {
@@ -118,6 +120,9 @@ export default function Workspace() {
     tab,
     setTab,
     busy,
+    deleteTarget,
+    deleteConfirmation,
+    setDeleteConfirmation,
     error,
     setError,
     notice,
@@ -313,15 +318,27 @@ export default function Workspace() {
                       {expenses.length === 1 ? "despesa" : "despesas"}
                     </p>
                   </div>
-                  <div className="avatar-stack" aria-label="Participantes">
-                    {members.slice(0, 4).map((member, index) => (
-                      <Avatar key={member.id} member={member} index={index} />
-                    ))}
-                    {members.length > 4 && (
-                      <span className="avatar overflow-avatar">
-                        +{members.length - 4}
-                      </span>
-                    )}
+                  <div className="group-heading-actions">
+                    <div className="avatar-stack" aria-label="Participantes">
+                      {members.slice(0, 4).map((member, index) => (
+                        <Avatar key={member.id} member={member} index={index} />
+                      ))}
+                      {members.length > 4 && (
+                        <span className="avatar overflow-avatar">
+                          +{members.length - 4}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="icon-button delete-group-button"
+                      aria-label="Excluir grupo"
+                      title="Excluir grupo"
+                      disabled={busy || !!loadError}
+                      onClick={() => open("delete")}
+                    >
+                      <Trash2 size={19} />
+                    </button>
                   </div>
                 </div>
               </section>
@@ -485,7 +502,9 @@ export default function Workspace() {
               ? "Novo grupo"
               : modal === "member"
                 ? "Adicionar participante"
-                : "Nova despesa"
+                : modal === "delete"
+                  ? "Excluir grupo"
+                  : "Nova despesa"
           }
           close={() => {
             if (!busy) setModal(null);
@@ -493,6 +512,16 @@ export default function Workspace() {
         >
           <form onSubmit={submit} aria-busy={busy}>
             <fieldset className="form-fields" disabled={busy}>
+              {modal === "delete" && deleteTarget && (
+                <DeleteGroupConfirmation
+                  group={deleteTarget}
+                  value={deleteConfirmation}
+                  onChange={(value) => {
+                    setDeleteConfirmation(value);
+                    setError("");
+                  }}
+                />
+              )}
               {modal === "group" && (
                 <>
                   <label>
@@ -680,19 +709,34 @@ export default function Workspace() {
               >
                 Cancelar
               </button>
-              <button className="button primary" disabled={busy}>
+              <button
+                className={
+                  modal === "delete" ? "button danger" : "button primary"
+                }
+                disabled={
+                  busy ||
+                  (modal === "delete" &&
+                    (!deleteTarget || deleteConfirmation !== deleteTarget.name))
+                }
+              >
                 {busy ? (
                   <LoaderCircle size={17} className="spin" />
+                ) : modal === "delete" ? (
+                  <Trash2 size={17} />
                 ) : (
                   <Check size={17} />
                 )}
                 {busy
-                  ? "Salvando..."
+                  ? modal === "delete"
+                    ? "Excluindo..."
+                    : "Salvando..."
                   : modal === "group"
                     ? "Criar grupo"
                     : modal === "member"
                       ? "Adicionar"
-                      : "Salvar despesa"}
+                      : modal === "delete"
+                        ? "Excluir grupo"
+                        : "Salvar despesa"}
               </button>
             </div>
           </form>

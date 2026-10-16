@@ -7,7 +7,13 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import type { Category, Currency, GroupData, SplitMode } from "../lib/types";
+import type {
+  Category,
+  Currency,
+  Group,
+  GroupData,
+  SplitMode,
+} from "../lib/types";
 import type { GroupCommand } from "../application/groups";
 import {
   calculateSplit,
@@ -19,7 +25,12 @@ import { MAX_GROUP_MEMBERS } from "../lib/limits";
 import { convertMoney } from "../lib/fx";
 import { calculateBalances, planSettlement } from "../lib/settlement";
 import { readSplitSpec } from "../presentation/expense-form";
-import { loadGroups, saveGroup } from "../presentation/groups-client";
+import {
+  loadGroups,
+  saveGroup,
+  deleteGroup,
+} from "../presentation/groups-client";
+import { withoutGroup } from "../presentation/group-state";
 
 const empty: GroupData = { groups: [], members: [], expenses: [], shares: [] };
 
@@ -28,11 +39,13 @@ export default function useWorkspace() {
   const [selected, setSelected] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [modal, setModal] = useState<"group" | "expense" | "member" | null>(
-    null,
-  );
+  const [modal, setModal] = useState<
+    "group" | "expense" | "member" | "delete" | null
+  >(null);
   const [tab, setTab] = useState("expenses");
   const [busy, setBusy] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Group | null>(null);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [category, setCategory] = useState<Category>("trip");
@@ -100,6 +113,9 @@ export default function useWorkspace() {
   function open(kind: typeof modal) {
     setError("");
     setModal(kind);
+    setDeleteTarget(kind === "delete" ? (group ?? null) : null);
+    setDeleteConfirmation("");
+    if (kind === "delete") return;
     setParticipants(members.map((m) => m.id));
     setSplitMode("equal");
     setExpenseAmount("");
@@ -133,6 +149,28 @@ export default function useWorkspace() {
     setError("");
     setBusy(true);
     try {
+      if (modal === "delete") {
+        if (!deleteTarget || deleteConfirmation !== deleteTarget.name)
+          throw new Error("O nome informado deve ser igual ao nome do grupo.");
+        await deleteGroup(deleteTarget.id);
+        setData((current) => withoutGroup(current, deleteTarget.id));
+        setSelected((current) =>
+          current === deleteTarget.id ? null : current,
+        );
+        setTab("expenses");
+        setMemberDetail(null);
+        setModal(null);
+        setDeleteTarget(null);
+        setNotice("Grupo excluido.");
+        try {
+          await refresh();
+        } catch {
+          setLoadError(
+            "O grupo foi excluido, mas a lista nao atualizou. Recarregue os grupos.",
+          );
+        }
+        return;
+      }
       let payload: GroupCommand;
       if (modal === "group") {
         const names = String(form.get("members"))
@@ -238,6 +276,9 @@ export default function useWorkspace() {
     tab,
     setTab,
     busy,
+    deleteTarget,
+    deleteConfirmation,
+    setDeleteConfirmation,
     error,
     setError,
     notice,

@@ -22,6 +22,9 @@ function fixture(overrides: Partial<GroupTransaction> = {}) {
     shares: [],
   };
   const tx: GroupTransaction = {
+    async deleteGroup() {
+      calls.push("delete");
+    },
     async insertGroup() {
       calls.push("group");
     },
@@ -80,6 +83,26 @@ const expense: CreateExpenseInput = {
   currency: "USD",
   exchangeRate: "5.25",
 };
+
+test("group deletion locks and deletes transactionally and tolerates a missing group", async () => {
+  const existing = fixture();
+  await existing.service.deleteGroup("group");
+  assert.deepEqual(existing.calls, ["begin", "lock", "delete", "commit"]);
+  const missing = fixture({
+    async lockGroup() {
+      return undefined;
+    },
+  });
+  await missing.service.deleteGroup("missing");
+  assert.deepEqual(missing.calls, ["begin", "commit"]);
+  const failed = fixture({
+    async deleteGroup() {
+      throw new Error("Delete failed");
+    },
+  });
+  await assert.rejects(failed.service.deleteGroup("group"), /Delete failed/);
+  assert.deepEqual(failed.calls, ["begin", "lock", "rollback"]);
+});
 
 test("application creates group and members in one transaction without HTTP or SQL", async () => {
   const { service, calls, snapshot } = fixture();

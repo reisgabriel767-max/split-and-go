@@ -350,6 +350,38 @@ main {
 .secondary:hover {
   background: #f0f5f2;
 }
+.danger {
+  background: #ac3328;
+  border-color: #ac3328;
+  color: white;
+}
+.danger:hover {
+  background: #8e281f;
+  border-color: #8e281f;
+}
+.group-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.delete-group-button {
+  color: #a83228;
+}
+.delete-group-button:hover {
+  background: #fff0ed;
+}
+.delete-group-confirmation > p {
+  margin-bottom: 24px;
+  overflow-wrap: anywhere;
+}
+.delete-group-confirmation > label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
 .group-overview {
   border-bottom: 1px solid var(--line);
 }

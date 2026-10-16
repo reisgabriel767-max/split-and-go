@@ -15,6 +15,11 @@ import type { Database } from "./database";
 
 function transactionRepository(tx: Database): GroupTransaction {
   return {
+    async deleteGroup(groupId) {
+      await tx.query("DELETE FROM expenses WHERE group_id=$1", [groupId]);
+      await tx.query("DELETE FROM members WHERE group_id=$1", [groupId]);
+      await tx.query("DELETE FROM groups WHERE id=$1", [groupId]);
+    },
     async insertGroup(group) {
       await tx.query(
         "INSERT INTO groups (id, name, currency, category) VALUES ($1,$2,$3,$4)",

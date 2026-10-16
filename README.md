@@ -6,7 +6,7 @@ MVP para organizar despesas de grupos, calcular saldos individuais e sugerir um 
 
 Fluxo implementado com Next.js 16, React 19, TypeScript e PostgreSQL: grupos, participantes, tres tipos de rateio, conversao de moedas com cotacao registrada, saldos, extratos e plano de acerto. Os dados persistem entre recargas.
 
-O MVP suporta BRL, USD e EUR. A cotacao e manual. Novos grupos e inclusoes de membros respeitam o limite de 20 participantes, dentro da garantia de minimo global de transferencias. Grupos legados maiores permanecem acessiveis, com a ressalva descrita abaixo. Nao ha autenticacao, edicao ou exclusao de lancamentos; o ambiente atual e uma demonstracao local. Os testes passaram no PostgreSQL embarcado, no PostgreSQL 18 externo e no container PostgreSQL 17 da CI, incluindo a aplicacao compilada. Os materiais de apresentacao estao preparados; o ensaio, a videochamada e o acesso publico ao quadro continuam pendentes.
+O MVP suporta BRL, USD e EUR, com cotacao manual registrada por despesa. Novos grupos e inclusoes de membros respeitam o limite de 20 participantes, dentro da garantia de minimo global de transferencias. Grupos legados maiores permanecem acessiveis, com os limites descritos abaixo. Grupos podem ser excluidos com confirmacao, removendo tambem seus integrantes, despesas e rateios. O ambiente e local, sem autenticacao, edicao ou exclusao individual de lancamentos.
 
 ## Arquitetura atual
 
@@ -24,11 +24,11 @@ flowchart LR
     Browser --> Domain
 ```
 
-O navegador chama `GET/POST /api/groups` pelo cliente HTTP em `src/presentation/groups-client.ts`. O Route Handler valida a entrada com Zod e traduz respostas e erros, delegando a `createGroupUseCases` em `src/application/groups.ts`. Os casos de uso coordenam criacao de grupo, inclusao de membro, registro de despesa e consulta do snapshot; dependem de `GroupRepository`, sem Next.js nem SQL.
+O navegador chama `GET/POST/DELETE /api/groups` pelo cliente HTTP em `src/presentation/groups-client.ts`. O Route Handler valida a entrada com Zod e traduz respostas e erros, delegando a `createGroupUseCases` em `src/application/groups.ts`. Os casos de uso coordenam criacao e exclusao de grupo, inclusao de membro, registro de despesa e consulta do snapshot; dependem de `GroupRepository`, sem Next.js nem SQL.
 
 `SqlGroupRepository`, em `src/infrastructure/`, implementa esse contrato com SQL parametrizado e o adaptador `Database`. Preserva escrita atomica, bloqueio do grupo com `FOR UPDATE` e leitura `REPEATABLE READ READ ONLY`. O dominio continua em `src/lib/money.ts`, `fx.ts`, `settlement.ts`, `types.ts` e `limits.ts`, sem React, HTTP ou banco. `src/lib/db.ts` apenas reexporta a infraestrutura para compatibilidade com testes e ferramentas existentes.
 
-No frontend, `useWorkspace` controla estado, formularios, selecao e operacoes; `Workspace` compoe a tela, `GroupPanels` apresenta os paineis e `ExpenseList` organiza a tabela responsiva. As regras financeiras foram preservadas; a etapa visual posterior modernizou o CSS, os indicadores, formularios e navegacao por teclado. A rota e o ponto de composicao que escolhe o repositorio SQL e o gerador de IDs. Veja [docs/architecture.md](docs/architecture.md) e [docs/ui-modernization.md](docs/ui-modernization.md).
+No frontend, `useWorkspace` controla estado, formularios, selecao e operacoes; `Workspace` compoe a tela, `GroupPanels` apresenta os paineis e `ExpenseList` organiza a tabela responsiva. As regras financeiras foram preservadas; a etapa visual posterior modernizou o CSS, os indicadores, formularios e navegacao por teclado. A rota e o ponto de composicao que escolhe o repositorio SQL e o gerador de IDs. Veja [docs/architecture.md](docs/architecture.md).
 
 O desenvolvimento local usa a aplicacao Node.js com PostgreSQL embarcado (PGlite) por padrao, sem Docker. Quando `DATABASE_URL` esta definida, a mesma camada de persistencia usa `pg` para conectar ao PostgreSQL externo; esse caminho foi validado com PostgreSQL 18.4 nativo e PostgreSQL 17 em container no GitHub Actions. `compose.yaml` usa a mesma imagem PostgreSQL 17, mas o comando Compose nao foi executado neste computador, que nao possui Docker disponivel. Producao exige `DATABASE_URL`; o fallback embarcado e restrito a desenvolvimento e testes. Filas e cache nao sao necessarios para este recorte.
 
@@ -95,9 +95,9 @@ Os testes comparam planos pequenos a uma busca exaustiva independente e incluem 
 
 O backlog esta em [docs/backlog.md](docs/backlog.md) e nas [issues do repositorio](https://github.com/reisgabriel767-max/split-and-go/issues).
 
-O [quadro Split&Go - MVP](https://github.com/users/reisgabriel767-max/projects/1) usa as colunas Backlog, In Progress, In Review, Testing e Done. O quadro permanece privado por decisao do responsavel; antes da entrega, sera necessario disponibilizar acesso de leitura aos avaliadores conforme os requisitos do case.
+O [quadro publico Split&Go - MVP](https://github.com/users/reisgabriel767-max/projects/1) usa as colunas Backlog, In Progress, In Review, Testing e Done. A leitura e publica; edicao e administracao permanecem restritas as permissoes existentes.
 
-Os commits devem ser pequenos e descrever mudancas reais, seguindo Conventional Commits e referenciando as issues relacionadas, por exemplo: `feat: add group creation (#2)` ou `fix: preserve cents when splitting expenses (#3)`.
+O historico utiliza Conventional Commits, com os tipos `feat`, `fix`, `refactor` e `docs`. Commits de funcionalidades e correcoes incluem referencias a issues, como `feat: add group creation (#2)`. Os commits recentes de arquitetura e interface nao possuem referencia numerica a issue.
 
 ## Execucao local
 
@@ -128,7 +128,7 @@ npm run typecheck
 npm run build
 ```
 
-A suite atual tem 38 testes: 23 originais, 11 da separacao arquitetural e quatro de renderizacao estatica da interface. Em 16/10/2026, passaram 37 no PGlite (um caso externo ignorado), todos os 38 no PostgreSQL 18.4 exclusivo de testes, tipos, build e fluxo HTTP compilado. A interface anterior foi conferida em banco isolado; a modernizacao visual posterior ainda requer conferencia em navegador nas larguras 1920, 1366, 768 e 390px, pois o acesso pela ferramenta foi bloqueado. Testes de HTML estatico nao substituem essa verificacao. A [CI historica](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38650831945) representa a versao anterior de 23 testes; consulte [docs/delivery.md](docs/delivery.md) para o estado de publicacao atual. O Compose local e seu volume persistente ainda nao foram executados.
+A suite local tem 46 testes, incluindo exclusao de grupo, rollback e preservacao dos demais registros. Em 16/10/2026, passaram 45 no PGlite, com um caso de concorrencia externa ignorado, e todos os 46 no PostgreSQL 18.4 de testes. Tipos, build e fluxo HTTP compilado, incluindo DELETE, tambem passaram. A [CI publicada](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38937774034) representa a versao anterior de 38 testes, sem a nova exclusao. A interface ainda nao possui verificacao visual nas larguras 1920, 1366, 768 e 390px; testes de HTML estatico nao substituem essa verificacao. O Compose local e seu volume persistente tambem nao foram testados.
 
 ### Validacao com PostgreSQL externo
 
@@ -146,13 +146,19 @@ Remove-Item Env:SPLITGO_TEST_DATABASE_URL
 
 Os resultados observados e as pendencias estao em [docs/validation.md](docs/validation.md); a lista de entrega esta em [docs/delivery.md](docs/delivery.md).
 
-Os materiais para a videochamada incluem [slides editaveis](docs/apresentacao.pptx), [roteiro de demonstracao](docs/demo.md), [defesa tecnica](docs/defesa-tecnica.md) e [treino de logica](docs/treino-logica.md). Os slides nao substituem a demonstracao ao vivo nem o entendimento do codigo pelo candidato.
+A apresentacao esta nos [slides editaveis](docs/apresentacao-final.pptx). A [matriz de aderencia](docs/checklist-apresentacao.md) registra requisitos, evidencias e verificacoes pendentes.
 
 ### Integracao continua
 
 O workflow [Validate SplitGo](https://github.com/reisgabriel767-max/split-and-go/actions) repete os testes embarcados, os testes externos com container PostgreSQL 17, o build e o teste HTTP de producao. Ele executa em push e pull request com alteracoes de codigo, e pode ser iniciado manualmente. Alteracoes apenas no README ou em docs/ nao repetem a suite automaticamente. As actions oficiais estao fixadas por commit, com permissao de leitura do repositorio.
 
 O esquema evolui por arquivos SQL ordenados em `db/`. A tabela `schema_migrations` registra os arquivos ja aplicados; a inicializacao aplica os pendentes em transacao, com bloqueio dessa tabela. `002_split_modes.sql` adiciona o modo e os percentuais, preservando despesas existentes como igualitarias. Para futuras alteracoes, adicione uma nova migracao; nao edite migracoes aplicadas. Reinicie a aplicacao depois de adicionar migracoes.
+
+### Exclusao de grupos
+
+O icone de lixeira no cabecalho do grupo abre uma confirmacao com o nome do grupo. A exclusao requer a digitacao exata desse nome e remove permanentemente integrantes, despesas e rateios vinculados. Cancelamento e nomes divergentes nao enviam a requisicao.
+
+`DELETE /api/groups` recebe `{ "groupId": "UUID-do-grupo" }` e responde HTTP 204 sem corpo. O schema exige um unico UUID, com verificacao de origem equivalente ao POST. A operacao bloqueia o grupo e remove despesas, partes, integrantes e grupo em uma transacao. Uma falha desfaz todas as remocoes. Repetir a exclusao de um ID inexistente retorna 204, sem afetar outros grupos.
 
 ### Contrato do rateio
 
@@ -168,9 +174,9 @@ Em `POST /api/groups`, uma despesa recebe `memberIds` e um campo `split`:
 }
 ```
 
-O campo `value` usa pontos-base no modo `percentage` (6000 = 60%) e centavos no modo `fixed`. As partes devem corresponder exatamente aos `memberIds`, sem faltantes, extras ou repeticoes. O modo `equal` usa apenas `{ "mode": "equal" }`. Omitir `split` mantem a compatibilidade com o fluxo inicial e assume divisao igualitaria. Os exemplos de identificadores acima sao ilustrativos; envie UUIDs reais do grupo.
+O campo `value` usa pontos-base no modo `percentage` (6000 = 60%) e centavos no modo `fixed`. As partes devem corresponder exatamente aos `memberIds`, sem faltantes, extras ou repeticoes. O modo `equal` usa apenas `{ "mode": "equal" }`. Omitir `split` assume divisao igualitaria. Os identificadores do exemplo sao ilustrativos; a API exige UUIDs de integrantes do grupo.
 
-Para cambio, envie `currency` com a moeda original e `exchangeRate` como texto decimal, por exemplo `"5.25"`. `amount` no pedido continua em centavos da moeda original: USD 10,01 usa `amount: 1001`; em um grupo BRL, a taxa 5,25 produz `amount: 5255` na resposta persistida, com `original_amount: 1001`. As partes fixas do pedido sempre usam centavos da moeda base. Omitir `currency` assume a moeda do grupo e taxa 1; despesas estrangeiras exigem cotacao explicita.
+No cambio, `currency` identifica a moeda original e `exchangeRate` contem a taxa como texto decimal, por exemplo `"5.25"`. `amount` no pedido usa centavos da moeda original: USD 10,01 corresponde a `amount: 1001`; em um grupo BRL, a taxa 5,25 produz `amount: 5255` na resposta persistida, com `original_amount: 1001`. As partes fixas do pedido sempre usam centavos da moeda base. Omitir `currency` assume a moeda do grupo e taxa 1; despesas estrangeiras exigem cotacao explicita.
 
 ### Estrutura
 
@@ -188,7 +194,3 @@ Para cambio, envie `currency` com a moeda original e `exchangeRate` como texto d
 - `tests`: dominio, aplicacao, apresentacao, fronteiras e integracao com ambos os bancos.
 
 As fotografias de capa sao carregadas do Unsplash; a funcionalidade dos grupos nao depende delas.
-
-## Demonstracao
-
-O roteiro em [docs/demo.md](docs/demo.md) organiza a apresentacao do produto e a explicacao das decisoes tecnicas. Antes de entregar, revise o acesso ao quadro e prepare a explicacao do codigo e o exercicio de logica ao vivo. O fluxo local com scripts esta validado; valide o container tambem caso essa seja a forma escolhida para a demonstracao.

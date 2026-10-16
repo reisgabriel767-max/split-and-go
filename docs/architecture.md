@@ -1,219 +1,138 @@
-# Arquitetura atual e relatorio de refatoracao
+# Arquitetura do Split&Go
 
-Verificacao local: 16/10/2026. Monolito modular fullstack em Next.js 16.4.0. Nenhum commit ou push foi feito nesta refatoracao.
+Monolito modular fullstack com Next.js 16.4.0, React 19, TypeScript e PostgreSQL. Referencia: 16/10/2026.
 
-## Diagnostico inicial
-
-- A rota de 245 linhas misturava protocolo HTTP, schemas, geracao de IDs, politicas de negocio, SQL, transacoes e tratamento de erros por mensagens de excecao.
-- Workspace tinha 1055 linhas, reunindo carregamento, fetch, navegacao, formularios, calculos derivados e todos os paineis visuais.
-- As regras de dinheiro e acerto ja estavam separadas de React e banco. Foram preservadas, sem renomeacoes apenas para criar uma pasta domain.
-- Database ja isolava pg e PGlite. O problema era o SQL das operacoes continuar dentro do handler HTTP, nao a ausencia de um ORM.
-- O frontend dependia de uma funcao de parsing exportada por um componente visual. Essa funcao agora pertence a presentation/expense-form.ts.
-
-Antes de editar, foram lidos AGENTS.md, README, fontes, SQL, testes e guias locais do Next. A referencia inicial executada foi: 22 testes PGlite aprovados, um externo ignorado, typecheck aprovado e build aprovado.
-
-## Estrutura antes
+## Estrutura
 
 ```text
 src/
-  app/api/groups/route.ts     HTTP, aplicacao e SQL juntos
-  components/workspace.tsx    Estado, HTTP, formularios e paineis juntos
-  components/expense-split.tsx
-  components/currency-fields.tsx
-  components/settlement-panel.tsx
-  lib/
-    db.ts                    Conexao, transacoes e migracoes
-    money.ts, fx.ts, settlement.ts, types.ts, limits.ts
-db/                          Tres migracoes
-tests/                       23 testes, mais helper de banco
-```
-
-## Estrutura depois
-
-```text
-src/
-  app/api/groups/route.ts           HTTP e composicao das dependencias
+  app/
+    page.tsx                       Pagina principal
+    api/groups/route.ts            HTTP e composicao das dependencias
   application/
-    groups.ts                      Quatro casos de uso e comandos tipados
-    group-repository.ts            Contratos GroupRepository/GroupTransaction
-    errors.ts                      ApplicationError e codigos explicitos
+    groups.ts                      Casos de uso e comandos tipados
+    group-repository.ts            GroupRepository e GroupTransaction
+    errors.ts                      Erros de aplicacao
   infrastructure/
-    database.ts                    Database, pg, PGlite e migracoes
-    sql-group-repository.ts        SQL, mapeamentos, transacoes e locks
+    database.ts                    Adaptadores pg/PGlite e migracoes
+    sql-group-repository.ts         SQL, transacoes e bloqueios
   presentation/
-    groups-http.ts                 Zod, Origin e traducao de erros HTTP
-    groups-client.ts               Cliente fetch tipado e testavel
-    expense-form.ts                Textos do formulario para unidades exatas
-  hooks/use-workspace.ts            Estado e coordenacao da interacao
+    groups-http.ts                 Zod, verificacao de origem e erros HTTP
+    groups-client.ts               Cliente fetch
+    expense-form.ts                Conversao dos campos para unidades exatas
+    group-state.ts                 Remocao consistente do grupo no estado local
+  hooks/use-workspace.ts            Estado e coordenacao da interface
   components/
     workspace.tsx                  Composicao visual e formularios
-    group-panels.tsx                Despesas, saldos, extratos, membros e acerto
+    group-panels.tsx                Saldos, extratos, participantes e acerto
+    expense-list.tsx                Tabela responsiva de despesas
     expense-split.tsx               Campos e previas dos rateios
     currency-fields.tsx             Campos de cambio
-    settlement-panel.tsx            Apresentacao das transferencias
+    settlement-panel.tsx            Plano de transferencias
+    delete-group-confirmation.tsx   Confirmacao de exclusao permanente
   lib/
-    money.ts, fx.ts, settlement.ts, types.ts, limits.ts  Dominio existente
+    money.ts                       Centavos, percentuais e rateios
+    fx.ts                          Conversao decimal e validacao de taxas
+    settlement.ts                  Saldos e minimizacao de transferencias
+    types.ts                       Entidades e DTOs
+    limits.ts                      Limite de participantes
     db.ts                          Reexportacao compativel da infraestrutura
-db/                                Migracoes intactas
-tests/                             34 testes, mais helper de banco
+db/                                Migracoes SQL ordenadas
+tests/                             Testes unitarios e de integracao
 ```
 
-A rota ficou com 59 linhas; Workspace ficou com 655. Essa contagem mostra a separacao, mas nao e a prova de qualidade: o objetivo e que cada responsabilidade possa ser testada sem carregar as demais.
+## Dependencias
 
-## Responsabilidades e dependencias
-
-### Dominio
-
-Os modulos financeiros de src/lib nao importam React, Next, HTTP, pg ou PGlite. Decimal.js continua como biblioteca aritmetica de fx.ts. As entidades/contratos existentes continuam em types.ts para evitar quebrar seus consumidores. O formato GroupData da interface foi reutilizado: nao foram criadas entidades duplicadas com nomes novos e o mesmo conteudo.
-
-money.ts mantem centavos inteiros, percentuais em pontos-base, maiores restos e desempate por ID. fx.ts mantem HALF_UP antes do rateio, taxa historica e partes fixas na moeda base. settlement.ts mantem a busca exata ate 20 saldos ativos e o fallback legado identificado. Nenhuma dessas implementacoes foi alterada.
-
-### Aplicacao
-
-createGroupUseCases recebe um GroupRepository e uma funcao newId. Seus quatro casos de uso sao:
-
-- createGroup: valida capacidade e nomes distintos e grava grupo/membros em uma unidade transacional.
-- addGroupMember: bloqueia o grupo, verifica existencia e capacidade e insere o membro.
-- createExpense: bloqueia o grupo, converte, rateia, verifica pertencimento e solicita a gravacao atomica da despesa e das partes.
-- getGroupsSnapshot: consulta o snapshot pelo contrato de repositorio.
-
-Os comandos sao TypeScript e nao contêm NextRequest ou NextResponse. Os formatos externos e dados textuais continuam sendo validados na fronteira HTTP com Zod. Os casos de uso recebem esses comandos normalizados e aplicam as politicas de coordenacao e dominio. A camada nao e um segundo schema HTTP e nao e um mecanismo de validacao de objetos arbitrarios enviados por outros runtimes.
-
-ApplicationError explicita GROUP_NOT_FOUND, INVALID_MEMBERS, MEMBER_LIMIT, DUPLICATE_MEMBER e INVALID_INPUT. SplitError e CurrencyError continuam sendo falhas de dominio. Erros inesperados de infraestrutura nao viram sucesso nem sao expostos ao cliente.
-
-### Infraestrutura
-
-SqlGroupRepository implementa os contratos definidos pela aplicacao. GroupTransaction oferece operacoes de negocio, nao strings SQL: lockGroup, countMembers, memberIds, insertGroup, insertMember e insertExpense. ExpenseRecord usa campos explicitos; o repositorio os mapeia para colunas e parametros SQL. Os dados do snapshot mantem o DTO ja consumido pela interface.
-
-O repositorio recebe uma funcao que resolve Database. Isso permite conexao tardia, testes com adaptadores reais e injecao controlada de falhas. Nao existe um repositorio singleton que capture uma conexao antiga. O estado global da conexao continua o mesmo, para preservar a inicializacao usada pelo Next e pelos testes existentes.
-
-database.ts foi movido de lib para infrastructure sem alterar seus adaptadores, pool ou algoritmo de migracao. lib/db.ts reexporta Database, database e migrate por compatibilidade. Nao ha duas instancias globais ou dois caminhos de migracao.
-
-Na escrita, repository.transaction delega a Database.transaction. O callback recebe um repositorio preso a essa mesma transacao. insertExpense grava a despesa e todas as partes ali. Uma falha posterior desfaz tudo. O codigo SQL 23505 vira DUPLICATE_MEMBER depois do rollback; o handler nao conhece codigos do driver.
-
-getSnapshot usa REPEATABLE READ READ ONLY antes das quatro consultas. lockGroup usa SELECT ... FOR UPDATE antes de contagem ou alteracao. Foram preservadas as consultas, a ordenacao e a representacao de data e taxa no JSON. Nao houve nova migracao, alteracao de chave ou mudanca no banco demonstrativo.
-
-### Apresentacao
-
-A rota e o ponto de composicao do servidor: escolhe SqlGroupRepository, database e randomUUID. Fora dessa composicao, trata apenas HTTP e delega. groups-http.ts concentra os schemas, a verificacao Origin e a traducao de falhas. groups-client.ts concentra URL, no-store, JSON, fetch e mensagens de erro para o cliente.
-
-useWorkspace guarda o estado e coordena carga, selecao, formularios, previas, envio e refresh. Workspace mantem a estrutura de pagina e o JSX dos formularios. GroupPanels recebe props e apresenta as abas; Avatar e compartilhado nesse arquivo. Os demais componentes visuais continuam com suas responsabilidades anteriores. expense-form.ts permite testar parsing sem importar React. expense-split.tsx reexporta readSplitSpec para compatibilidade com seu caminho anterior.
-
-Nao foram alterados CSS, identidade visual, textos de fluxo ou modos de navegacao. Nao foi criado store global, framework de formularios ou biblioteca nova.
-
-## Fluxo de registro de despesa
-
-```text
-Formulario em Workspace
-  useWorkspace e parsing de presentation/expense-form.ts
-  saveGroup em presentation/groups-client.ts
-  POST /api/groups
-  Zod e Origin em presentation/groups-http.ts
-  createExpense em application/groups.ts
-  GroupRepository.transaction
-  GroupTransaction.lockGroup
-  convertMoney e calculateSplit (dominio)
-  verificacao dos IDs de membros
-  GroupTransaction.insertExpense
-  SqlGroupRepository: INSERT despesa + INSERTs das partes
-  Database: COMMIT ou ROLLBACK
-  HTTP 201 com id
-  refresh do hook
-  snapshot consistente, saldos e plano derivados
+```mermaid
+flowchart LR
+    UI[React e useWorkspace] --> HTTP[Route Handler e Zod]
+    HTTP --> APP[Casos de uso]
+    APP --> DOMAIN[money, fx e settlement]
+    APP --> PORT[GroupRepository]
+    SQL[SqlGroupRepository] -. implementa .-> PORT
+    SQL --> DB[Database: pg ou PGlite]
 ```
 
-O frontend fecha o modal depois da confirmacao da escrita e antes do refresh, como antes. Uma falha posterior de leitura informa que os dados foram salvos; nao incentiva uma segunda gravacao. Isso nao e uma chave de idempotencia.
+O dominio e a aplicacao nao importam React, Next.js, HTTP ou drivers de banco. A aplicacao depende do contrato GroupRepository, implementado pela infraestrutura. A rota seleciona SqlGroupRepository, database e randomUUID.
 
-## Contratos preservados
+O frontend reutiliza os modulos de dominio para previas, saldos e plano de acerto. Essa dependencia nao substitui a validacao no servidor. Os DTOs compartilham os tipos de `src/lib/types.ts`.
 
-- Mesmos GET/POST /api/groups, sem adicionar endpoints.
-- GET retorna groups, members, expenses e shares, com os mesmos campos.
-- POST recebe action=group/member/expense e responde 201 com id.
-- Mantidos 400 para entrada/dominio, 403 para Origin invalido, 409 para nome duplicado e 503 para falha inesperada; mensagens anteriores preservadas.
-- Moeda e split omitidos mantem os defaults existentes.
-- Novos grupos limitados a 20, despesas legadas com ate 30 IDs aceitas, dados antigos preservados.
-- Pagador pode ficar fora do rateio, mas deve pertencer ao grupo.
-- Sem autenticacao, pagamentos, edicao/exclusao ou deploy adicionados.
+## Dominio
 
-## Principios aplicados sem formalismo adicional
+- `money.ts`: valores inteiros em centavos, percentuais em pontos-base, validacao das partes e distribuicao de restos com desempate por identificador estavel.
+- `fx.ts`: Decimal.js para conversao, arredondamento half-up uma unica vez antes do rateio e preservacao da taxa historica.
+- `settlement.ts`: saldo igual a pago menos devido, plano guloso inicial e programacao dinamica por subconjuntos para comprovar o minimo global em ate 20 saldos nao nulos.
+- `limits.ts`: novos grupos e inclusoes limitados a 20 participantes. Grupos legados maiores permanecem acessiveis, com limites de otimalidade documentados no README.
 
-- Responsabilidade unica: protocolo na rota/helpers, coordenacao nos casos de uso, SQL no repositorio, estado no hook e JSX nos componentes.
-- Inversao de dependencias: aplicacao conhece GroupRepository; o SQL implementa esse contrato. Banco e gerador de IDs sao injetados.
-- Segregacao de interfaces: casos de uso recebem operacoes relevantes ao grupo; nao recebem o driver ou uma API generica de SQL.
-- Substituicao: testes de casos de uso usam um repositorio em memoria; a integracao valida a implementacao SQL nos dois adaptadores. Isso fornece evidencia comportamental, nao uma prova formal completa de Liskov.
-- Aberto/fechado em uma fronteira concreta: pode-se substituir o adaptador de persistencia sem editar os casos de uso. Nao se afirma que qualquer nova regra de negocio dispensa alteracoes no codigo.
-- Clean Architecture pragmatica: dependencias internas nao importam frameworks externos de apresentacao/persistencia. Nao foi criado um conteiner de DI nem uma classe por acao apenas para seguir um diagrama.
+## Casos de uso
 
-## Testes executados
+`createGroupUseCases(repository, newId)` recebe o repositorio e o gerador de identificadores por injecao explicita.
 
-| Etapa/comando | Resultado nesta refatoracao |
+| Operacao | Responsabilidade |
 | --- | --- |
-| Baseline npm test | 22 aprovados, 1 externo ignorado |
-| Baseline typecheck e build | Aprovados |
-| Apos separar backend, suite original | 22 aprovados, 1 externo ignorado |
-| npm test com novos testes | 33 aprovados, 1 externo ignorado |
-| npm run typecheck | Aprovado |
-| npx tsc --noEmit --noUnusedLocals | Aprovado na verificacao da extracao |
-| npm run build | Aprovado com backend e frontend refatorados |
-| npm run test:postgres | 34 aprovados, sem ignorados |
-| npm run test:production | Fluxo HTTP compilado aprovado |
-| Navegador, instancia isolada | Grupo, tres rateios, cambio, recarga, extrato, inclusao de membro e acerto conferidos |
-| Tela estreita, largura 390 | Conferida sem rolagem horizontal |
+| createGroup | Valida capacidade e nomes distintos; grava grupo e integrantes em transacao. |
+| addGroupMember | Bloqueia o grupo, verifica existencia e capacidade e insere o integrante. |
+| createExpense | Bloqueia o grupo, converte, rateia, verifica pertencimento e grava despesa e partes. |
+| getGroupsSnapshot | Consulta o snapshot pelo contrato de repositorio. |
+| deleteGroup | Bloqueia o grupo e remove seus registros vinculados em transacao. IDs inexistentes nao alteram dados. |
 
-O PostgreSQL 18.4 de validacao usou apenas 127.0.0.1:55433 e esquemas exclusivos por arquivo/cenario. A UI compilada usou 127.0.0.1:3101 em outro schema temporario. Os esquemas foram removidos, a instancia de UI foi encerrada e o banco temporario foi parado; a consulta final encontrou zero schemas splitgo_ restantes.
+Os comandos sao tipados, sem NextRequest ou NextResponse. Zod valida o formato externo na fronteira HTTP. O dominio verifica invariantes monetarias e o caso de uso verifica pertencimento e capacidade.
 
-Os testes novos sao:
+ApplicationError utiliza os codigos GROUP_NOT_FOUND, INVALID_MEMBERS, MEMBER_LIMIT, DUPLICATE_MEMBER e INVALID_INPUT. SplitError e CurrencyError representam falhas de dominio.
 
-- application.test.ts: quatro testes de coordenacao, IDs injetados, lock/capacidade, conversao antes do rateio, historico e validacao de membros.
-- repository.test.ts: dois testes com banco real, incluindo falha depois de inserir a primeira parte e verificacao de rollback da despesa inteira, e traducao de duplicidade.
-- presentation.test.ts: quatro testes de cliente HTTP, parsing, defaults/legados e traducao de erros/status.
-- architecture.test.ts: um teste que inspeciona imports do dominio e aplicacao e rejeita dependencias de React, Next, drivers ou camadas externas.
+## Persistencia
 
-Os sete arquivos de testes antigos foram preservados. A CI remota anterior continua documentada como evidencia historica da versao de 23 testes; esta refatoracao nao foi publicada nem executada na CI remota.
+SqlGroupRepository contem SQL parametrizado e mapeamentos entre comandos e colunas. GroupTransaction expoe operacoes especificas, como lockGroup, countMembers, memberIds e insertExpense, sem expor SQL aos casos de uso.
 
-## Arquivos modificados e justificativa
+Database fornece query, exec e transaction. Com DATABASE_URL, o adaptador usa um pool pg de ate cinco conexoes. Sem essa variavel, desenvolvimento utiliza PGlite persistente em `.data/postgres` e testes utilizam memoria. Producao exige DATABASE_URL.
 
-| Arquivo/grupo | Mudanca |
-| --- | --- |
-| app/api/groups/route.ts | Remocao de SQL e coordenacao de negocio; composicao e HTTP |
-| application/*.ts | Casos de uso, erros e contratos orientados as operacoes |
-| infrastructure/database.ts | Codigo de banco movido, sem mudanca de comportamento |
-| infrastructure/sql-group-repository.ts | SQL e garantias transacionais fora do HTTP |
-| lib/db.ts | Reexportacao para nao quebrar imports antigos |
-| presentation/groups-http.ts | Schemas e erros antes presentes na rota |
-| presentation/groups-client.ts | Fetch extraido do componente e injetavel nos testes |
-| presentation/expense-form.ts | Parsing extraido do componente visual |
-| hooks/use-workspace.ts | Estado e coordenacao da interface |
-| components/group-panels.tsx | JSX dos paineis extraido sem trocar classes CSS |
-| components/workspace.tsx | Composicao visual consumindo hook/paineis |
-| components/expense-split.tsx | Consome/reexporta o parser extraido |
-| tests novos | Validacao das novas fronteiras e garantias |
-| README e esta documentacao | Estrutura, fluxos, evidencias e limites atuais |
+Na escrita, o callback transacional usa a mesma conexao para todas as operacoes. Despesa e partes recebem COMMIT em conjunto; qualquer falha causa ROLLBACK. O codigo SQL 23505 e traduzido para DUPLICATE_MEMBER depois do rollback.
 
-money.ts, fx.ts, settlement.ts, types.ts, limits.ts, globals.css, migracoes, package.json e package-lock.json nao foram alterados. O iniciador C#, executavel e scripts locais preexistentes foram preservados. Arquivos locais nao relacionados, incluindo .vs e o TXT anterior, nao foram removidos nem revertidos.
+Na exclusao, as despesas sao removidas primeiro, com cascade para as partes, seguidas dos integrantes e do grupo. A ordem preserva as chaves estrangeiras entre participantes, pagadores e rateios. Todas as etapas pertencem a mesma transacao, sem migracao adicional.
 
-## Limitacoes e riscos remanescentes
+`SELECT ... FOR UPDATE` bloqueia a linha do grupo antes de verificar capacidade ou registrar alteracoes. `getSnapshot` define `REPEATABLE READ READ ONLY` antes das quatro consultas, mantendo grupos, integrantes, despesas e partes na mesma visao consistente. As escritas utilizam o isolamento padrao do banco.
 
-- Workspace ainda contem o JSX dos formularios, e useWorkspace ainda coordena bastante estado. Extrair formularios tipados pode ser uma etapa futura quando houver complexidade real que justifique mais contratos.
-- GroupData reutiliza os nomes de campos existentes. Nao houve um modelo de leitura novo com mapeamento de todos os campos para camelCase, pois isso mudaria contratos sem necessidade.
-- A verificacao estatica de imports e util, mas nao substitui revisao de dependencias dinamicas ou de efeitos colaterais.
-- Persistem os limites do MVP: sem autenticacao, idempotencia de escrita, paginacao, sincronizacao multiusuario automatica, backup operacional ou registro de pagamentos.
-- O minimo global continua restrito a 20 saldos ativos; o cadastro atual fica dentro disso, mas legados maiores podem receber plano simplificado.
-- O Compose local e seus volumes nao foram testados nesta etapa; foi usado PostgreSQL nativo exclusivo.
-- Nao foi executado o teste do iniciador contra o banco demonstrativo nesta refatoracao. Seus arquivos ficaram intactos; o caminho Next utilizado por ele e os contratos de readiness foram preservados e a aplicacao compilada passou no smoke.
-- Slides e relatorios antigos representam suas datas/versoes originais; o material atual para explicar esta arquitetura e este documento e o novo TXT refatorado.
+As migracoes numeradas em `db/` sao aplicadas em transacao, com controle pela tabela schema_migrations e bloqueio exclusivo durante a inicializacao. `src/lib/db.ts` reexporta a infraestrutura para compatibilidade de imports.
 
-## Sugestoes de commits na etapa original
+## Fluxo de uma despesa
 
-Na etapa original nao houve commit automatico. Posteriormente o responsavel autorizou a publicacao; o fechamento e a CI estao em [delivery.md](delivery.md). A lista abaixo preserva o planejamento original.
+1. Workspace apresenta os campos e useWorkspace transforma os valores em um comando.
+2. saveGroup envia JSON para POST /api/groups.
+3. A rota verifica a origem, interpreta o JSON e valida o schema Zod.
+4. createExpense abre a transacao e bloqueia o grupo.
+5. convertMoney calcula o total convertido; calculateSplit determina as partes.
+6. O caso de uso verifica pagador e participantes contra os IDs do grupo.
+7. O repositorio insere a despesa e todas as partes na mesma transacao.
+8. A resposta HTTP 201 devolve o ID criado.
+9. O frontend fecha o modal e solicita um novo snapshot por GET.
+10. calculateBalances e planSettlement derivam os saldos e as transferencias.
 
-1. refactor: extract group use cases and transactional SQL repository
-2. refactor: separate workspace state and presentation panels
-3. test: cover application boundaries and repository rollback
-4. docs: describe modular architecture and local refactor validation
+O modal fecha apos a confirmacao da escrita, antes do refresh. Uma falha de leitura posterior apresenta estado de dados salvos sem lista atualizada. Nao ha chave de idempotencia de escrita.
 
-Antes de preparar qualquer commit, separar os arquivos preexistentes e gerados dos conjuntos acima. Nao incluir .vs, dados, credenciais ou o executavel local automaticamente.
+## Contrato HTTP
 
-## Explicacao para a Stage Consulting
+- GET /api/groups retorna groups, members, expenses e shares.
+- POST /api/groups recebe action group, member ou expense e retorna HTTP 201 com id.
+- DELETE /api/groups recebe groupId como UUID e retorna HTTP 204 sem corpo, inclusive para ID inexistente.
+- HTTP 400 indica entrada ou regra invalida; 403 indica origem invalida; 409 indica nome duplicado; 503 indica falha inesperada.
+- Moeda omitida assume a moeda do grupo; split omitido assume divisao igualitaria.
+- Pagador e participantes pertencem ao grupo. O pagador pode ficar fora do rateio.
+- Despesas de grupos legados aceitam ate 30 participantes; novos grupos continuam limitados a 20.
 
-O Split&Go continua sendo uma unica aplicacao Next.js. A camada de apresentacao traduz HTTP e interacoes do React. Os casos de uso coordenam as operacoes por contratos de persistencia. O dominio mantem as regras exatas de dinheiro, conversao e minimizacao sem depender do framework. A infraestrutura implementa esses contratos em PostgreSQL ou PGlite, preservando transacoes, locks e snapshots consistentes. A separacao permite testar uma regra ou um caso de uso sem iniciar a interface, sem adicionar complexidade de microsservicos ou alterar a experiencia do produto.
+## Interface
+
+useWorkspace concentra estado, carga, selecao, formularios, previas, envio e refresh. Workspace compoe a pagina e os formularios. GroupPanels apresenta os paineis, ExpenseList organiza a tabela e os componentes de rateio e cambio exibem campos e previas.
+
+A interface utiliza CSS compartilhado, componentes React e icones Lucide. A navegacao das abas inclui setas, Home e End. Nao ha store global adicional ou biblioteca de formularios. A atualizacao entre navegadores nao e automatica.
+
+## Principios e limites
+
+A separacao aplica responsabilidade unica, inversao de dependencias e contratos orientados as operacoes do dominio. A persistencia pode ser substituida sem alterar os casos de uso. Os testes de aplicacao injetam repositorios de teste e os testes de integracao validam os adaptadores reais.
+
+O projeto utiliza principios de Clean Architecture sem adotar integralmente o padrao. Tipos de leitura sao compartilhados, o hook coordena varias responsabilidades de interface e os formularios permanecem em Workspace. Nao ha conteiner de injecao de dependencias.
+
+Permanecem fora do MVP: autenticacao, autorizacao por conta, idempotencia, paginacao, sincronizacao multiusuario automatica, backup operacional e registro de pagamentos efetivos. A verificacao estatica de imports nao cobre dependencias dinamicas.
+
+## Verificacao
+
+A suite local possui 46 testes, incluindo dominio, aplicacao, HTTP, exclusao, rollback, migracoes, concorrencia e renderizacao estatica. O fluxo compilado e validado por HTTP. A [CI 38937774034](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38937774034) representa a versao anterior de 38 testes, sem exclusao. Resultados e limites estao em [validation.md](validation.md).
