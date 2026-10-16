@@ -43,9 +43,15 @@ export default function SettlementPanel({
           <li className="transfer-row" key={`${transfer.from}-${transfer.to}`}>
             <span className="transfer-number">{index + 1}</span>
             <div className="transfer-parties">
-              <strong>{name(transfer.from)}</strong>
+              <strong>
+                <small>Devedor</small>
+                {name(transfer.from)}
+              </strong>
               <ArrowRight size={17} aria-label="paga para" />
-              <strong>{name(transfer.to)}</strong>
+              <strong>
+                <small>Credor</small>
+                {name(transfer.to)}
+              </strong>
             </div>
             <strong className="transfer-value">
               {formatMoney(transfer.amount, currency)}

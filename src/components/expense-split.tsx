@@ -7,13 +7,12 @@ import {
   Percent,
   Users,
 } from "lucide-react";
-import type { Member, SplitMode, SplitSpec } from "@/lib/types";
+import type { Member, SplitMode } from "@/lib/types";
 import {
   calculateSplit,
   formatMoney,
   formatPercentage,
   parseMoney,
-  parsePercentage,
 } from "@/lib/money";
 
 export const splitLabels: Record<SplitMode, string> = {
@@ -22,23 +21,8 @@ export const splitLabels: Record<SplitMode, string> = {
   fixed: "Valores fixos",
 };
 
-export function readSplitSpec(
-  mode: SplitMode,
-  participants: string[],
-  values: Record<string, string>,
-): SplitSpec {
-  if (mode === "equal") return { mode };
-  return {
-    mode,
-    allocations: participants.map((memberId) => ({
-      memberId,
-      value:
-        mode === "percentage"
-          ? parsePercentage(values[memberId] ?? "")
-          : parseMoney(values[memberId] ?? "", true),
-    })),
-  };
-}
+import { readSplitSpec } from "../presentation/expense-form";
+export { readSplitSpec } from "../presentation/expense-form";
 
 interface Props {
   members: Member[];

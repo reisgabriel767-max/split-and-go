@@ -1,24 +1,12 @@
 "use client";
 
+import { useEffect, useRef, type ReactNode } from "react";
 import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
-import {
-  ArrowDownLeft,
-  ArrowLeft,
   ArrowRight,
-  ArrowUpRight,
   ArrowLeftRight,
   Check,
   CheckCircle2,
   ChevronRight,
-  CircleDollarSign,
   Home,
   LoaderCircle,
   Plus,
@@ -30,29 +18,13 @@ import {
   Wallet,
   X,
 } from "lucide-react";
-import type {
-  Category,
-  Currency,
-  GroupData,
-  Member,
-  SplitMode,
-} from "@/lib/types";
-import {
-  calculateSplit,
-  formatMoney,
-  formatPercentage,
-  parseMoney,
-  splitEqually,
-} from "@/lib/money";
-import ExpenseSplit, {
-  readSplitSpec,
-  splitLabels,
-} from "@/components/expense-split";
+import type { Category } from "@/lib/types";
+import ExpenseSplit from "@/components/expense-split";
 
 import CurrencyFields from "@/components/currency-fields";
-import SettlementPanel from "@/components/settlement-panel";
-import { convertMoney, moneyInput } from "@/lib/fx";
-import { calculateBalances, planSettlement } from "@/lib/settlement";
+import { moneyInput } from "@/lib/fx";
+import useWorkspace from "@/hooks/use-workspace";
+import GroupPanels, { Avatar } from "@/components/group-panels";
 import { MAX_GROUP_MEMBERS } from "@/lib/limits";
 
 const categories = {
@@ -75,21 +47,6 @@ const categories = {
       "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?auto=format&fit=crop&w=1200&q=80",
   },
 };
-const empty: GroupData = { groups: [], members: [], expenses: [], shares: [] };
-
-function Avatar({ member, index = 0 }: { member: Member; index?: number }) {
-  return (
-    <span className={`avatar color-${index % 4}`} aria-hidden="true">
-      {member.name
-        .trim()
-        .split(/\s+/)
-        .map((s) => s[0])
-        .slice(0, 2)
-        .join("")
-        .toUpperCase()}
-    </span>
-  );
-}
 
 function Modal({
   title,
@@ -102,7 +59,9 @@ function Modal({
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    ref.current?.showModal();
+    const dialog = ref.current;
+    dialog?.showModal();
+    return () => dialog?.close();
   }, []);
   return (
     <dialog
@@ -135,207 +94,55 @@ function localDate() {
 }
 
 export default function Workspace() {
-  const [data, setData] = useState<GroupData>(empty);
-  const [selected, setSelected] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-  const [modal, setModal] = useState<"group" | "expense" | "member" | null>(
-    null,
-  );
-  const [tab, setTab] = useState("expenses");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [category, setCategory] = useState<Category>("trip");
-  const [participants, setParticipants] = useState<string[]>([]);
-  const [splitMode, setSplitMode] = useState<SplitMode>("equal");
-  const [percentageValues, setPercentageValues] = useState<
-    Record<string, string>
-  >({});
-  const [fixedValues, setFixedValues] = useState<Record<string, string>>({});
-  const [expenseAmount, setExpenseAmount] = useState("");
-  const [expenseCurrency, setExpenseCurrency] = useState<Currency>("BRL");
-  const [exchangeRate, setExchangeRate] = useState("");
-  const [memberDetail, setMemberDetail] = useState<string | null>(null);
-  const group = data.groups.find((g) => g.id === selected) ?? data.groups[0];
-  const members = data.members.filter((m) => m.group_id === group?.id);
-  const expenses = data.expenses.filter((e) => e.group_id === group?.id);
-  const currency = group?.currency ?? "BRL";
-  const money = (value: number) => formatMoney(value, currency);
-  const total = expenses.reduce((sum, expense) => sum + expense.amount, 0);
-  const memberName = (id: string) =>
-    members.find((m) => m.id === id)?.name ?? "Participante";
-  const balances = useMemo(
-    () =>
-      calculateBalances(
-        data.members.filter((m) => m.group_id === group?.id),
-        data.expenses.filter((e) => e.group_id === group?.id),
-        data.shares,
-      ),
-    [data, group?.id],
-  );
-  const plan = useMemo(() => planSettlement(balances), [balances]);
-  let convertedPreview: number | null = null;
-  try {
-    convertedPreview = convertMoney(
-      parseMoney(expenseAmount),
-      expenseCurrency,
-      currency,
-      expenseCurrency === currency ? "1" : exchangeRate,
-    ).amount;
-  } catch {
-    /* Incomplete forms have no converted preview. */
-  }
-  const outstanding = balances.reduce(
-    (sum, member) => sum + Math.max(0, member.balance),
-    0,
-  );
-
-  const refresh = useCallback(async () => {
-    const response = await fetch("/api/groups", { cache: "no-store" });
-    const body = await response.json();
-    if (!response.ok)
-      throw new Error(body.error ?? "Falha ao carregar os grupos.");
-    setData(body);
-    setLoadError("");
-  }, []);
-
-  useEffect(() => {
-    refresh()
-      .catch((err) => setLoadError(err.message))
-      .finally(() => setLoading(false));
-  }, [refresh]);
-  useEffect(() => {
-    if (notice) {
-      const timer = setTimeout(() => setNotice(""), 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [notice]);
-
-  function open(kind: typeof modal) {
-    setError("");
-    setModal(kind);
-    setParticipants(members.map((m) => m.id));
-    setSplitMode("equal");
-    setExpenseAmount("");
-    setExpenseCurrency(currency);
-    setExchangeRate("");
-    setFixedValues({});
-    setPercentageValues(
-      members.length
-        ? Object.fromEntries(
-            splitEqually(
-              10000,
-              members.map((m) => m.id),
-            ).map((part) => [
-              part.memberId,
-              (part.amount / 100).toFixed(2).replace(".", ","),
-            ]),
-          )
-        : {},
-    );
-  }
-  function chooseGroup(id: string) {
-    setSelected(id);
-    setTab("expenses");
-    setMemberDetail(null);
-  }
-
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (busy) return;
-    const form = new FormData(event.currentTarget);
-    setError("");
-    setBusy(true);
-    try {
-      let payload: object;
-      if (modal === "group") {
-        const names = String(form.get("members"))
-          .split(/[,\n]/)
-          .map((n) => n.trim())
-          .filter(Boolean);
-        if (!names.length)
-          throw new Error("Adicione pelo menos um participante.");
-        if (names.length > MAX_GROUP_MEMBERS)
-          throw new Error(
-            `O grupo pode ter ate ${MAX_GROUP_MEMBERS} participantes.`,
-          );
-        if (new Set(names.map((n) => n.toLowerCase())).size !== names.length)
-          throw new Error("Use um nome diferente para cada participante.");
-        payload = {
-          action: "group",
-          name: form.get("name"),
-          currency: form.get("currency"),
-          category,
-          members: names,
-        };
-      } else if (modal === "member") {
-        payload = {
-          action: "member",
-          groupId: group?.id,
-          name: form.get("name"),
-        };
-      } else {
-        if (!participants.length)
-          throw new Error("Selecione quem participa da despesa.");
-        const amount = parseMoney(String(form.get("amount")));
-        const converted = convertMoney(
-          amount,
-          expenseCurrency,
-          currency,
-          expenseCurrency === currency ? "1" : exchangeRate,
-        );
-        const split = readSplitSpec(
-          splitMode,
-          participants,
-          splitMode === "percentage" ? percentageValues : fixedValues,
-        );
-        calculateSplit(converted.amount, participants, split);
-        payload = {
-          action: "expense",
-          groupId: group?.id,
-          description: form.get("description"),
-          amount,
-          payerId: form.get("payer"),
-          spentOn: form.get("date"),
-          memberIds: participants,
-          split,
-          currency: expenseCurrency,
-          exchangeRate: converted.rate,
-        };
-      }
-      const response = await fetch("/api/groups", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-      if (!response.ok)
-        throw new Error(result.error ?? "Nao foi possivel salvar.");
-      const kind = modal;
-      // Close after a confirmed write so a failed refresh cannot cause a duplicate submission.
-      setModal(null);
-      if (kind === "group") chooseGroup(result.id);
-      setNotice(
-        kind === "group"
-          ? "Grupo criado."
-          : kind === "member"
-            ? "Participante adicionado."
-            : "Despesa registrada.",
-      );
-      try {
-        await refresh();
-      } catch {
-        setLoadError(
-          "Os dados foram salvos, mas a lista nao atualizou. Recarregue os grupos.",
-        );
-      }
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const workspace = useWorkspace();
+  const {
+    data,
+    group,
+    members,
+    expenses,
+    currency,
+    total,
+    balances,
+    plan,
+    convertedPreview,
+    outstanding,
+    money,
+    memberName,
+    loading,
+    setLoading,
+    loadError,
+    setLoadError,
+    refresh,
+    modal,
+    setModal,
+    tab,
+    setTab,
+    busy,
+    error,
+    setError,
+    notice,
+    category,
+    setCategory,
+    participants,
+    setParticipants,
+    splitMode,
+    setSplitMode,
+    percentageValues,
+    setPercentageValues,
+    fixedValues,
+    setFixedValues,
+    expenseAmount,
+    setExpenseAmount,
+    expenseCurrency,
+    setExpenseCurrency,
+    exchangeRate,
+    setExchangeRate,
+    memberDetail,
+    setMemberDetail,
+    open,
+    chooseGroup,
+    submit,
+  } = workspace;
 
   return (
     <div className="workspace">
@@ -370,6 +177,8 @@ export default function Workspace() {
             return (
               <button
                 key={g.id}
+                title={g.name}
+                aria-current={group?.id === g.id ? "true" : undefined}
                 className={
                   group?.id === g.id ? "group-link selected" : "group-link"
                 }
@@ -515,33 +324,44 @@ export default function Workspace() {
                     )}
                   </div>
                 </div>
-                <div className="stats">
-                  <div>
-                    <span>
-                      <Receipt size={16} /> Total de despesas
-                    </span>
-                    <strong>{money(total)}</strong>
-                  </div>
-                  <div>
-                    <span>
-                      <ArrowLeftRight size={16} /> Saldo a acertar
-                    </span>
-                    <strong
-                      className={outstanding ? "orange-text" : "green-text"}
-                    >
-                      {money(outstanding)}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>
-                      <Users size={16} /> Media por participante
-                    </span>
-                    <strong>
-                      {money(
-                        members.length ? Math.round(total / members.length) : 0,
-                      )}
-                    </strong>
-                  </div>
+              </section>
+              <section className="stats" aria-label="Indicadores financeiros">
+                <div>
+                  <span>
+                    <Receipt size={16} /> Total de despesas
+                  </span>
+                  <strong>{money(total)}</strong>
+                  <p>{expenses.length} despesas registradas</p>
+                </div>
+                <div className="outstanding-stat">
+                  <span>
+                    <ArrowLeftRight size={16} /> Saldo a acertar
+                  </span>
+                  <strong
+                    className={outstanding ? "orange-text" : "green-text"}
+                  >
+                    {money(outstanding)}
+                  </strong>
+                  <button
+                    className="summary-link"
+                    onClick={() => {
+                      setTab("settlement");
+                      setMemberDetail(null);
+                    }}
+                  >
+                    Ver plano de acerto <ArrowRight size={14} />
+                  </button>
+                </div>
+                <div>
+                  <span>
+                    <Users size={16} /> Media por participante
+                  </span>
+                  <strong>
+                    {money(
+                      members.length ? Math.round(total / members.length) : 0,
+                    )}
+                  </strong>
+                  <p>Na moeda base {currency}</p>
                 </div>
               </section>
               <div className="content-heading">
@@ -564,7 +384,35 @@ export default function Workspace() {
                         aria-selected={tab === id}
                         id={`tab-${id}`}
                         aria-controls={`panel-${id}`}
+                        tabIndex={tab === id ? 0 : -1}
                         className={tab === id ? "tab active" : "tab"}
+                        onKeyDown={(event) => {
+                          const keys = [
+                            "ArrowLeft",
+                            "ArrowRight",
+                            "Home",
+                            "End",
+                          ];
+                          if (!keys.includes(event.key)) return;
+                          event.preventDefault();
+                          const tabs = Array.from(
+                            event.currentTarget.parentElement!.querySelectorAll<HTMLButtonElement>(
+                              '[role="tab"]',
+                            ),
+                          );
+                          const current = tabs.indexOf(event.currentTarget);
+                          const next =
+                            event.key === "Home"
+                              ? 0
+                              : event.key === "End"
+                                ? tabs.length - 1
+                                : (current +
+                                    (event.key === "ArrowRight" ? 1 : -1) +
+                                    tabs.length) %
+                                  tabs.length;
+                          tabs[next].focus();
+                          tabs[next].click();
+                        }}
                         onClick={() => {
                           setTab(String(id));
                           setMemberDetail(null);
@@ -597,228 +445,24 @@ export default function Workspace() {
                 role="tabpanel"
                 id={`panel-${tab}`}
                 aria-labelledby={`tab-${tab}`}
+                tabIndex={0}
               >
-                {tab === "expenses" &&
-                  (expenses.length ? (
-                    <div className="expense-list">
-                      <div className="table-heading">
-                        <span>DESPESA</span>
-                        <span>QUEM PAGOU</span>
-                        <span>VALOR</span>
-                      </div>
-                      {expenses.map((expense) => (
-                        <div key={expense.id} className="expense-row">
-                          <div className="expense-info">
-                            <span className="receipt-icon">
-                              <Receipt size={19} />
-                            </span>
-                            <div>
-                              <strong>{expense.description}</strong>
-                              <p>
-                                {new Intl.DateTimeFormat("pt-BR", {
-                                  day: "2-digit",
-                                  month: "short",
-                                  year: "numeric",
-                                  timeZone: "UTC",
-                                }).format(
-                                  new Date(`${expense.spent_on}T12:00:00Z`),
-                                )}{" "}
-                                <span className="dot-separator">/</span>{" "}
-                                {
-                                  data.shares.filter(
-                                    (s) => s.expense_id === expense.id,
-                                  ).length
-                                }{" "}
-                                pessoas
-                              </p>
-                            </div>
-                          </div>
-                          <span className="payer">
-                            {memberName(expense.payer_id)}
-                          </span>
-                          <div className="expense-value">
-                            <strong>{money(expense.amount)}</strong>
-                            <span>{splitLabels[expense.split_mode]}</span>
-                            {expense.original_currency !== currency && (
-                              <span className="original-value">
-                                {formatMoney(
-                                  expense.original_amount,
-                                  expense.original_currency,
-                                )}
-                                <br />1 {expense.original_currency} ={" "}
-                                {new Intl.NumberFormat("pt-BR", {
-                                  maximumFractionDigits: 6,
-                                }).format(Number(expense.exchange_rate))}{" "}
-                                {currency}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="empty-state">
-                      <span className="section-icon">
-                        <Receipt size={24} />
-                      </span>
-                      <h3>Uma conta para dividir?</h3>
-                      <p>As despesas de {group.name} ficam aqui.</p>
-                      <button
-                        className="button secondary"
-                        onClick={() => open("expense")}
-                      >
-                        <Plus size={16} /> Adicionar despesa
-                      </button>
-                    </div>
-                  ))}
-                {tab === "balances" &&
-                  (memberDetail ? (
-                    <>
-                      <button
-                        className="back-button"
-                        onClick={() => setMemberDetail(null)}
-                      >
-                        <ArrowLeft size={15} /> Todos os saldos
-                      </button>
-                      <h3 className="statement-title">
-                        Extrato de {memberName(memberDetail)}
-                      </h3>
-                      {expenses
-                        .filter(
-                          (e) =>
-                            e.payer_id === memberDetail ||
-                            data.shares.some(
-                              (s) =>
-                                s.expense_id === e.id &&
-                                s.member_id === memberDetail,
-                            ),
-                        )
-                        .map((e) => {
-                          const share = data.shares.find(
-                            (s) =>
-                              s.expense_id === e.id &&
-                              s.member_id === memberDetail,
-                          );
-                          return (
-                            <div className="statement-row" key={e.id}>
-                              <strong>
-                                {e.description}
-                                <span className="statement-mode">
-                                  {splitLabels[e.split_mode]}
-                                </span>
-                                {e.original_currency !== currency && (
-                                  <span className="statement-mode">
-                                    {formatMoney(
-                                      e.original_amount,
-                                      e.original_currency,
-                                    )}{" "}
-                                    <span className="dot-separator">/</span> 1{" "}
-                                    {e.original_currency} ={" "}
-                                    {new Intl.NumberFormat("pt-BR", {
-                                      maximumFractionDigits: 6,
-                                    }).format(Number(e.exchange_rate))}{" "}
-                                    {currency}
-                                  </span>
-                                )}
-                              </strong>
-                              <div>
-                                <span>
-                                  Pagou:{" "}
-                                  {money(
-                                    e.payer_id === memberDetail ? e.amount : 0,
-                                  )}
-                                </span>
-                                <span>
-                                  Sua parte
-                                  {share?.percentage != null
-                                    ? ` (${formatPercentage(share.percentage)})`
-                                    : ""}
-                                  : {money(share?.amount ?? 0)}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      {!expenses.length && (
-                        <p className="muted">Nenhuma despesa registrada.</p>
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <div className="balance-heading">
-                        <h3>Saldos individuais</h3>
-                        <span className="muted">
-                          {outstanding === 0
-                            ? "Tudo em dia"
-                            : "Valores na moeda do grupo"}
-                        </span>
-                      </div>
-                      {balances.map((member, index) => (
-                        <button
-                          className="balance-row"
-                          key={member.id}
-                          onClick={() => setMemberDetail(member.id)}
-                        >
-                          <Avatar member={member} index={index} />
-                          <div className="balance-person">
-                            <strong>{member.name}</strong>
-                            <span>
-                              Pagou {money(member.paid)}{" "}
-                              <span className="dot-separator">/</span> Sua parte{" "}
-                              {money(member.owed)}
-                            </span>
-                          </div>
-                          <div
-                            className={`balance-amount ${member.balance < 0 ? "orange-text" : "green-text"}`}
-                          >
-                            <strong>
-                              {member.balance === 0 ? (
-                                <Check size={17} />
-                              ) : member.balance > 0 ? (
-                                <ArrowDownLeft size={17} />
-                              ) : (
-                                <ArrowUpRight size={17} />
-                              )}
-                              {money(Math.abs(member.balance))}
-                            </strong>
-                            <span>
-                              {member.balance === 0
-                                ? "Em dia"
-                                : member.balance > 0
-                                  ? "A receber"
-                                  : "A pagar"}
-                            </span>
-                          </div>
-                          <ChevronRight className="balance-chevron" size={17} />
-                        </button>
-                      ))}
-                    </>
-                  ))}
-                {tab === "settlement" && (
-                  <SettlementPanel
-                    plan={plan}
-                    balances={balances}
-                    currency={currency}
-                  />
-                )}
-                {tab === "members" && (
-                  <>
-                    <div className="balance-heading">
-                      <h3>Quem faz parte</h3>
-                      <span className="muted">
-                        {members.length > MAX_GROUP_MEMBERS
-                          ? `${members.length} participantes (grupo legado)`
-                          : `${members.length} de ${MAX_GROUP_MEMBERS} participantes`}
-                      </span>
-                    </div>
-                    {members.map((member, index) => (
-                      <div className="member-row" key={member.id}>
-                        <Avatar member={member} index={index} />
-                        <strong>{member.name}</strong>
-                      </div>
-                    ))}
-                  </>
-                )}
+                <GroupPanels
+                  tab={tab}
+                  data={data}
+                  group={group}
+                  members={members}
+                  expenses={expenses}
+                  currency={currency}
+                  balances={balances}
+                  plan={plan}
+                  memberDetail={memberDetail}
+                  setMemberDetail={setMemberDetail}
+                  outstanding={outstanding}
+                  open={open}
+                  money={money}
+                  memberName={memberName}
+                />
               </section>
               <footer className="page-footer">
                 <span>
@@ -847,182 +491,186 @@ export default function Workspace() {
             if (!busy) setModal(null);
           }}
         >
-          <form onSubmit={submit}>
-            {modal === "group" && (
-              <>
+          <form onSubmit={submit} aria-busy={busy}>
+            <fieldset className="form-fields" disabled={busy}>
+              {modal === "group" && (
+                <>
+                  <label>
+                    Nome do grupo
+                    <input
+                      name="name"
+                      placeholder="Ex.: Fim de semana na praia"
+                      required
+                      maxLength={80}
+                      autoFocus
+                    />
+                  </label>
+                  <fieldset className="category-field">
+                    <legend>Tipo de grupo</legend>
+                    <div className="segmented">
+                      {(
+                        Object.entries(categories) as [
+                          Category,
+                          typeof categories.trip,
+                        ][]
+                      ).map(([key, value]) => {
+                        const Icon = value.icon;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            aria-pressed={category === key}
+                            onClick={() => setCategory(key)}
+                            className={category === key ? "chosen" : ""}
+                          >
+                            <Icon size={17} /> {value.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </fieldset>
+                  <label>
+                    Moeda do grupo
+                    <select name="currency" defaultValue="BRL">
+                      <option value="BRL">BRL - Real brasileiro</option>
+                      <option value="USD">USD - Dolar americano</option>
+                      <option value="EUR">EUR - Euro</option>
+                    </select>
+                  </label>
+                  <label>
+                    Participantes (ate {MAX_GROUP_MEMBERS})
+                    <textarea
+                      name="members"
+                      placeholder="Ana, Bruno, Carla"
+                      required
+                      rows={3}
+                      maxLength={1800}
+                    />
+                  </label>
+                </>
+              )}
+              {modal === "member" && (
                 <label>
-                  Nome do grupo
+                  Nome do participante
                   <input
                     name="name"
-                    placeholder="Ex.: Fim de semana na praia"
+                    placeholder="Nome"
                     required
-                    maxLength={80}
+                    maxLength={60}
                     autoFocus
                   />
                 </label>
-                <fieldset className="category-field">
-                  <legend>Tipo de grupo</legend>
-                  <div className="segmented">
-                    {(
-                      Object.entries(categories) as [
-                        Category,
-                        typeof categories.trip,
-                      ][]
-                    ).map(([key, value]) => {
-                      const Icon = value.icon;
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          aria-pressed={category === key}
-                          onClick={() => setCategory(key)}
-                          className={category === key ? "chosen" : ""}
-                        >
-                          <Icon size={17} /> {value.label}
-                        </button>
-                      );
-                    })}
+              )}
+              {modal === "expense" && (
+                <>
+                  <div className="form-context">
+                    <span className="section-icon small">
+                      <Receipt size={17} />
+                    </span>
+                    <strong>{group?.name}</strong>
+                    <span>{currency}</span>
                   </div>
-                </fieldset>
-                <label>
-                  Moeda do grupo
-                  <select name="currency" defaultValue="BRL">
-                    <option value="BRL">BRL - Real brasileiro</option>
-                    <option value="USD">USD - Dolar americano</option>
-                    <option value="EUR">EUR - Euro</option>
-                  </select>
-                </label>
-                <label>
-                  Participantes (ate {MAX_GROUP_MEMBERS})
-                  <textarea
-                    name="members"
-                    placeholder="Ana, Bruno, Carla"
-                    required
-                    rows={3}
-                    maxLength={1800}
-                  />
-                </label>
-              </>
-            )}
-            {modal === "member" && (
-              <label>
-                Nome do participante
-                <input
-                  name="name"
-                  placeholder="Nome"
-                  required
-                  maxLength={60}
-                  autoFocus
-                />
-              </label>
-            )}
-            {modal === "expense" && (
-              <>
-                <div className="form-context">
-                  <span className="section-icon small">
-                    <Receipt size={17} />
-                  </span>
-                  <strong>{group?.name}</strong>
-                  <span>{currency}</span>
-                </div>
-                <label>
-                  Descricao
-                  <input
-                    name="description"
-                    placeholder="Ex.: Jantar de sexta"
-                    required
-                    maxLength={120}
-                    autoFocus
-                  />
-                </label>
-                <div className="form-grid">
                   <label>
-                    Valor ({expenseCurrency})
+                    Descricao
                     <input
-                      name="amount"
-                      value={expenseAmount}
-                      onChange={(event) => {
-                        setExpenseAmount(event.target.value);
-                        setError("");
-                      }}
-                      placeholder="0,00"
-                      inputMode="decimal"
+                      name="description"
+                      placeholder="Ex.: Jantar de sexta"
                       required
-                      maxLength={10}
+                      maxLength={120}
+                      autoFocus
                     />
                   </label>
+                  <div className="form-grid">
+                    <label className="amount-field">
+                      Valor ({expenseCurrency})
+                      <input
+                        name="amount"
+                        value={expenseAmount}
+                        onChange={(event) => {
+                          setExpenseAmount(event.target.value);
+                          setError("");
+                        }}
+                        placeholder="0,00"
+                        inputMode="decimal"
+                        required
+                        maxLength={10}
+                      />
+                    </label>
+                    <label>
+                      Data
+                      <input
+                        name="date"
+                        type="date"
+                        defaultValue={localDate()}
+                        required
+                      />
+                    </label>
+                  </div>
+                  <CurrencyFields
+                    source={expenseCurrency}
+                    target={currency}
+                    rate={exchangeRate}
+                    converted={convertedPreview}
+                    onSource={(value) => {
+                      setExpenseCurrency(value);
+                      setExchangeRate("");
+                      setError("");
+                    }}
+                    onRate={(value) => {
+                      setExchangeRate(value);
+                      setError("");
+                    }}
+                  />
                   <label>
-                    Data
-                    <input
-                      name="date"
-                      type="date"
-                      defaultValue={localDate()}
-                      required
-                    />
+                    Quem pagou?
+                    <select name="payer" defaultValue={members[0]?.id} required>
+                      {members.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.name}
+                        </option>
+                      ))}
+                    </select>
                   </label>
-                </div>
-                <CurrencyFields
-                  source={expenseCurrency}
-                  target={currency}
-                  rate={exchangeRate}
-                  converted={convertedPreview}
-                  onSource={(value) => {
-                    setExpenseCurrency(value);
-                    setExchangeRate("");
-                    setError("");
-                  }}
-                  onRate={(value) => {
-                    setExchangeRate(value);
-                    setError("");
-                  }}
-                />
-                <label>
-                  Quem pagou?
-                  <select name="payer" defaultValue={members[0]?.id} required>
-                    {members.map((member) => (
-                      <option key={member.id} value={member.id}>
-                        {member.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <ExpenseSplit
-                  members={members}
-                  participants={participants}
-                  mode={splitMode}
-                  values={
-                    splitMode === "percentage" ? percentageValues : fixedValues
-                  }
-                  amount={
-                    convertedPreview === null
-                      ? ""
-                      : moneyInput(convertedPreview)
-                  }
-                  currency={currency}
-                  onMode={(mode) => {
-                    setSplitMode(mode);
-                    setError("");
-                  }}
-                  onParticipants={(ids) => {
-                    setParticipants(ids);
-                    setError("");
-                  }}
-                  onValue={(id, value) => {
-                    setError("");
-                    const setter =
+                  <ExpenseSplit
+                    members={members}
+                    participants={participants}
+                    mode={splitMode}
+                    values={
                       splitMode === "percentage"
-                        ? setPercentageValues
-                        : setFixedValues;
-                    setter((current) => ({ ...current, [id]: value }));
-                  }}
-                />
-              </>
-            )}
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
+                        ? percentageValues
+                        : fixedValues
+                    }
+                    amount={
+                      convertedPreview === null
+                        ? ""
+                        : moneyInput(convertedPreview)
+                    }
+                    currency={currency}
+                    onMode={(mode) => {
+                      setSplitMode(mode);
+                      setError("");
+                    }}
+                    onParticipants={(ids) => {
+                      setParticipants(ids);
+                      setError("");
+                    }}
+                    onValue={(id, value) => {
+                      setError("");
+                      const setter =
+                        splitMode === "percentage"
+                          ? setPercentageValues
+                          : setFixedValues;
+                      setter((current) => ({ ...current, [id]: value }));
+                    }}
+                  />
+                </>
+              )}
+              {error && (
+                <p className="form-error" role="alert">
+                  {error}
+                </p>
+              )}
+            </fieldset>
             <div className="dialog-actions">
               <button
                 type="button"
