@@ -4,11 +4,14 @@
 
 - Implementacao funcional e modernizacao visual concluidas no checkout.
 - Validacao local: 38 testes externos aprovados, tipos, build e smoke HTTP de producao aprovados. Suite embarcada: 37 aprovados e um externo ignorado.
-- Publicacao das alteracoes de arquitetura e interface autorizada pelo responsavel. O resultado da publicacao e da CI sera registrado abaixo apos verificacao.
+- Arquitetura, interface e documentacao publicadas em main, com autorizacao do responsavel: commits 5d14e49, a0d5c6f e a0a8da0.
+- CI atual aprovada no commit a0a8da0: [execucao 38937774034](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38937774034). Inclui instalacao limpa, testes embarcados, PostgreSQL 17 em container, tipos, build e fluxo HTTP de producao. Atualizacoes posteriores apenas documentais nao mudam o codigo validado.
 - Conferencia visual da interface modernizada pendente em 1920, 1366, 768 e 390px: a ferramenta de navegador foi bloqueada. Testes de renderizacao estatica nao validam layout ou interacao real.
 - Quadro permanece privado por decisao do responsavel: requisito publico do case nao atendido.
 - Deploy bonus dispensado. Demonstracao sera local; nao ha URL publica da aplicacao.
 - Executavel e relatorios TXT completos permanecem como complementos locais; nao sao necessarios para executar o repositorio com npm.
+
+Links atuais para os avaliadores: [repositorio](https://github.com/reisgabriel767-max/split-and-go), [README](https://github.com/reisgabriel767-max/split-and-go/blob/main/README.md), [arquitetura](https://github.com/reisgabriel767-max/split-and-go/blob/main/docs/architecture.md) e [CI atual](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38937774034). Os slides antigos podem apoiar o ensaio, mas suas contagens de testes e descricao visual nao representam a versao atual; usar os documentos atuais como referencia tecnica.
 
 Os relatorios [architecture.md](architecture.md) e [ui-modernization.md](ui-modernization.md) registram as etapas. Os links historicos de CI e os slides abaixo representam a entrega anterior, de 23 testes, e nao comprovam as alteracoes atuais.
 

@@ -1,5 +1,7 @@
 # Modernizacao da interface - 16/10/2026
 
+Nota de fechamento posterior: a publicacao foi autorizada pelo responsavel e a CI do commit a0a8da0 passou. Veja [delivery.md](delivery.md). O relato de ausencia de commits abaixo descreve o encerramento da etapa visual antes dessa autorizacao.
+
 ## Escopo
 
 Alteracao de apresentacao, sem novas dependencias. Preservados endpoints,

@@ -203,7 +203,9 @@ money.ts, fx.ts, settlement.ts, types.ts, limits.ts, globals.css, migracoes, pac
 - Nao foi executado o teste do iniciador contra o banco demonstrativo nesta refatoracao. Seus arquivos ficaram intactos; o caminho Next utilizado por ele e os contratos de readiness foram preservados e a aplicacao compilada passou no smoke.
 - Slides e relatorios antigos representam suas datas/versoes originais; o material atual para explicar esta arquitetura e este documento e o novo TXT refatorado.
 
-## Sugestoes de commits, nao executadas
+## Sugestoes de commits na etapa original
+
+Na etapa original nao houve commit automatico. Posteriormente o responsavel autorizou a publicacao; o fechamento e a CI estao em [delivery.md](delivery.md). A lista abaixo preserva o planejamento original.
 
 1. refactor: extract group use cases and transactional SQL repository
 2. refactor: separate workspace state and presentation panels

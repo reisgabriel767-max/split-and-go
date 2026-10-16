@@ -8,7 +8,7 @@ Nenhum schema temporario restante; cluster de teste encerrado. O iniciador `Spli
 
 A interface modernizada ainda nao foi validada visualmente: a ferramenta de navegador foi bloqueada. Permanecem pendentes as larguras 1920, 1366, 768 e 390px e a interacao real dos controles. Os testes HTML estaticos e HTTP nao substituem testes visuais/E2E. O relato visual na secao arquitetural abaixo corresponde a interface anterior, nao a modernizacao.
 
-Publicacao autorizada em 16/10/2026; consultar [delivery.md](delivery.md) para o resultado de push e CI. [ui-modernization.md](ui-modernization.md) registra os arquivos alterados e as limitacoes desta etapa.
+Publicacao autorizada e realizada em 16/10/2026. A [CI 38937774034](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38937774034) terminou com sucesso no commit a0a8da0, incluindo testes embarcados e externos com PostgreSQL 17, tipos, build e smoke HTTP. Consultar [delivery.md](delivery.md) e [ui-modernization.md](ui-modernization.md) para arquivos alterados e limitacoes desta etapa.
 
 ## Refatoracao arquitetural local - 16/10/2026
 
