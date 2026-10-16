@@ -1,5 +1,23 @@
 # Validacao da entrega
 
+## Modernizacao visual e fechamento - 16/10/2026
+
+Estado atual: 37 testes aprovados no PGlite e um externo ignorado; 38 aprovados no PostgreSQL 18.4 isolado, nenhum ignorado. Typecheck, verificacao de imports nao utilizados, build e teste HTTP de producao aprovados. Quatro testes adicionais cobrem a renderizacao estatica da tabela, quatro paineis, tres rateios e campos de cambio.
+
+Nenhum schema temporario restante; cluster de teste encerrado. O iniciador `SplitGo.exe --check` confirmou pagina e API prontas em 127.0.0.1:3000, sem criar dados. O build exigiu permissao para junctions do Turbopack no Windows.
+
+A interface modernizada ainda nao foi validada visualmente: a ferramenta de navegador foi bloqueada. Permanecem pendentes as larguras 1920, 1366, 768 e 390px e a interacao real dos controles. Os testes HTML estaticos e HTTP nao substituem testes visuais/E2E. O relato visual na secao arquitetural abaixo corresponde a interface anterior, nao a modernizacao.
+
+Publicacao autorizada em 16/10/2026; consultar [delivery.md](delivery.md) para o resultado de push e CI. [ui-modernization.md](ui-modernization.md) registra os arquivos alterados e as limitacoes desta etapa.
+
+## Refatoracao arquitetural local - 16/10/2026
+
+Referencia antes de editar: 22 testes aprovados e um caso externo ignorado, typecheck e build aprovados. Depois da separacao de aplicacao, infraestrutura e apresentacao: 33 testes aprovados no PGlite e um externo ignorado; todos os 34 aprovados no PostgreSQL 18.4 exclusivo de validacao. Typecheck, build e smoke HTTP da aplicacao compilada aprovados.
+
+A interface foi conferida pelo navegador em uma instancia compilada isolada: criacao de grupo, tres rateios, cambio, recarga, extrato, inclusao de membro e plano de acerto. O viewport de 390 pixels nao apresentou rolagem horizontal. Os esquemas temporarios foram removidos e os processos de validacao encerrados. Nenhum lancamento foi criado ou alterado no banco demonstrativo.
+
+O relatorio [architecture.md](architecture.md) detalha os arquivos, principios aplicados, testes e riscos remanescentes. Os algoritmos financeiros, SQL de migracoes, CSS e iniciador C# foram preservados. Esta versao esta apenas no checkout local, sem commit, push ou nova execucao da CI remota. Os resultados abaixo sao historicos de versoes anteriores.
+
 Data da verificacao: 14/10/2026.
 
 ## Revalidacao de leitura concorrente

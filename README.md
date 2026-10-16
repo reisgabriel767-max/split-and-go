@@ -8,20 +8,27 @@ Fluxo implementado com Next.js 16, React 19, TypeScript e PostgreSQL: grupos, pa
 
 O MVP suporta BRL, USD e EUR. A cotacao e manual. Novos grupos e inclusoes de membros respeitam o limite de 20 participantes, dentro da garantia de minimo global de transferencias. Grupos legados maiores permanecem acessiveis, com a ressalva descrita abaixo. Nao ha autenticacao, edicao ou exclusao de lancamentos; o ambiente atual e uma demonstracao local. Os testes passaram no PostgreSQL embarcado, no PostgreSQL 18 externo e no container PostgreSQL 17 da CI, incluindo a aplicacao compilada. Os materiais de apresentacao estao preparados; o ensaio, a videochamada e o acesso publico ao quadro continuam pendentes.
 
-## Arquitetura proposta
+## Arquitetura atual
 
 Uma aplicacao fullstack evita manter dois projetos e dois deployments no MVP. Next.js atende a interface React e os endpoints no mesmo projeto; TypeScript ajuda a explicitar os contratos; PostgreSQL oferece transacoes e integridade entre grupos, participantes, despesas e rateios.
 
 ```mermaid
 flowchart LR
-    Browser[Navegador - React] --> App[Next.js - interface e endpoints]
-    App --> Domain[Conversao e rateio no servidor]
-    Domain --> Data[Camada de persistencia]
-    Data --> DB[(PostgreSQL)]
-    Browser --> Settlement[Saldos e plano de acerto no cliente]
+    Browser[React - Workspace e useWorkspace] --> HTTP[Route Handler - validacao e HTTP]
+    HTTP --> Application[Casos de uso - application/groups.ts]
+    Application --> Domain[Dominio - money, fx e settlement]
+    Application --> Port[Contrato GroupRepository]
+    SQL[SqlGroupRepository] -. implementa .-> Port
+    SQL --> Adapter[Database - pg ou PGlite]
+    Adapter --> DB[(PostgreSQL)]
+    Browser --> Domain
 ```
 
-O navegador chama `GET/POST /api/groups`. O servidor valida os dados com Zod, converte a moeda em `src/lib/fx.ts` usando Decimal.js e calcula o rateio em `src/lib/money.ts`; a persistencia grava uma despesa e suas partes na mesma transacao. O GET usa uma transacao somente de leitura com isolamento Repeatable Read, para retornar grupos, membros, despesas e partes do mesmo snapshot, mesmo com cadastros simultaneos. A interface deriva saldos, extratos e transferencias dos lancamentos e partes gravados usando `src/lib/settlement.ts`. Credenciais do banco ficam somente no servidor.
+O navegador chama `GET/POST /api/groups` pelo cliente HTTP em `src/presentation/groups-client.ts`. O Route Handler valida a entrada com Zod e traduz respostas e erros, delegando a `createGroupUseCases` em `src/application/groups.ts`. Os casos de uso coordenam criacao de grupo, inclusao de membro, registro de despesa e consulta do snapshot; dependem de `GroupRepository`, sem Next.js nem SQL.
+
+`SqlGroupRepository`, em `src/infrastructure/`, implementa esse contrato com SQL parametrizado e o adaptador `Database`. Preserva escrita atomica, bloqueio do grupo com `FOR UPDATE` e leitura `REPEATABLE READ READ ONLY`. O dominio continua em `src/lib/money.ts`, `fx.ts`, `settlement.ts`, `types.ts` e `limits.ts`, sem React, HTTP ou banco. `src/lib/db.ts` apenas reexporta a infraestrutura para compatibilidade com testes e ferramentas existentes.
+
+No frontend, `useWorkspace` controla estado, formularios, selecao e operacoes; `Workspace` compoe a tela, `GroupPanels` apresenta os paineis e `ExpenseList` organiza a tabela responsiva. As regras financeiras foram preservadas; a etapa visual posterior modernizou o CSS, os indicadores, formularios e navegacao por teclado. A rota e o ponto de composicao que escolhe o repositorio SQL e o gerador de IDs. Veja [docs/architecture.md](docs/architecture.md) e [docs/ui-modernization.md](docs/ui-modernization.md).
 
 O desenvolvimento local usa a aplicacao Node.js com PostgreSQL embarcado (PGlite) por padrao, sem Docker. Quando `DATABASE_URL` esta definida, a mesma camada de persistencia usa `pg` para conectar ao PostgreSQL externo; esse caminho foi validado com PostgreSQL 18.4 nativo e PostgreSQL 17 em container no GitHub Actions. `compose.yaml` usa a mesma imagem PostgreSQL 17, mas o comando Compose nao foi executado neste computador, que nao possui Docker disponivel. Producao exige `DATABASE_URL`; o fallback embarcado e restrito a desenvolvimento e testes. Filas e cache nao sao necessarios para este recorte.
 
@@ -121,7 +128,7 @@ npm run typecheck
 npm run build
 ```
 
-Os 23 testes cobrem rateios, cambio, historico, migracoes, plano de acerto, consistencia de leitura e limite de membros, incluindo compatibilidade com grupos legados maiores. No PGlite, 22 passam e o teste de duas conexoes concorrentes fica ignorado. Todos os 23 passaram na [CI com container PostgreSQL 17](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38650831945), incluindo tipos, build e fluxo HTTP compilado. A interface foi verificada em desktop e celular; a rejeicao de um grupo com 21 nomes tambem foi conferida no navegador. O comando Compose local, incluindo seu volume persistente, ainda nao foi executado.
+A suite atual tem 38 testes: 23 originais, 11 da separacao arquitetural e quatro de renderizacao estatica da interface. Em 16/10/2026, passaram 37 no PGlite (um caso externo ignorado), todos os 38 no PostgreSQL 18.4 exclusivo de testes, tipos, build e fluxo HTTP compilado. A interface anterior foi conferida em banco isolado; a modernizacao visual posterior ainda requer conferencia em navegador nas larguras 1920, 1366, 768 e 390px, pois o acesso pela ferramenta foi bloqueado. Testes de HTML estatico nao substituem essa verificacao. A [CI historica](https://github.com/reisgabriel767-max/split-and-go/actions/runs/38650831945) representa a versao anterior de 23 testes; consulte [docs/delivery.md](docs/delivery.md) para o estado de publicacao atual. O Compose local e seu volume persistente ainda nao foram executados.
 
 ### Validacao com PostgreSQL externo
 
@@ -167,14 +174,18 @@ Para cambio, envie `currency` com a moeda original e `exchangeRate` como texto d
 
 ### Estrutura
 
-- `src/app`: interface e endpoints Next.js.
-- `src/components/workspace.tsx`: grupos, formularios, despesas e extratos.
+- `src/app`: pagina, layout e Route Handler HTTP; composicao das dependencias no servidor.
+- `src/presentation`: schemas e erros HTTP, cliente fetch e parsing de formulario.
+- `src/application`: casos de uso, erros tipados e contratos de persistencia.
+- `src/infrastructure`: repositorio SQL e adaptadores PostgreSQL/PGlite.
+- `src/hooks/use-workspace.ts`: estado, selecao, formularios e interacoes.
+- `src/components/workspace.tsx`: composicao visual e formularios; `group-panels.tsx`: paineis.
 - `src/lib/money.ts`: parse monetario e rateio em centavos.
 - `src/lib/fx.ts`: conversao decimal, validacao de taxas e arredondamento.
 - `src/lib/settlement.ts`: saldos e plano de acerto.
-- `src/lib/db.ts`: conexao e transacoes com PGlite ou PostgreSQL.
+- `src/lib/db.ts`: reexportacao compativel de `src/infrastructure/database.ts`.
 - `db/001_initial.sql`: tabelas, chaves estrangeiras e restricoes.
-- `tests`: testes de dominio e integracao dos endpoints com PostgreSQL embarcado.
+- `tests`: dominio, aplicacao, apresentacao, fronteiras e integracao com ambos os bancos.
 
 As fotografias de capa sao carregadas do Unsplash; a funcionalidade dos grupos nao depende delas.
 

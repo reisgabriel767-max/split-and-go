@@ -16,7 +16,7 @@ Os exemplos da pasta local sao dados demonstrativos; nao representam pagamentos 
 
 - `money.ts`: valores inteiros em centavos, percentuais em pontos-base e maiores restos.
 - `fx.ts`: Decimal.js multiplica o valor original pela taxa e arredonda half-up uma vez.
-- `route.ts`: valida dados e pertencimento ao grupo; grava despesa e partes em uma transacao.
+- `route.ts` e `presentation/groups-http.ts`: validam o contrato HTTP e traduzem respostas/erros. `application/groups.ts` coordena pertencimento, conversao e rateio. `infrastructure/sql-group-repository.ts` grava despesa e partes na mesma transacao.
 - `settlement.ts`: saldo e total pago menos total devido; o plano exato maximiza subconjuntos de soma zero para reduzir transferencias.
 - Escopo do MVP: novos grupos tem no maximo 20 membros, dentro da garantia de minimo global. Grupos legados maiores continuam acessiveis e podem usar simplificacao, sem promessa de minimo quando ele nao foi comprovado.
 - Persistencia: PostgreSQL embarcado em desenvolvimento sem Docker, PostgreSQL externo quando DATABASE_URL esta definida. Migracoes SQL preservam os dados existentes.

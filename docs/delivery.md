@@ -1,5 +1,17 @@
 # Checklist de entrega
 
+## Fechamento atual - 16/10/2026
+
+- Implementacao funcional e modernizacao visual concluidas no checkout.
+- Validacao local: 38 testes externos aprovados, tipos, build e smoke HTTP de producao aprovados. Suite embarcada: 37 aprovados e um externo ignorado.
+- Publicacao das alteracoes de arquitetura e interface autorizada pelo responsavel. O resultado da publicacao e da CI sera registrado abaixo apos verificacao.
+- Conferencia visual da interface modernizada pendente em 1920, 1366, 768 e 390px: a ferramenta de navegador foi bloqueada. Testes de renderizacao estatica nao validam layout ou interacao real.
+- Quadro permanece privado por decisao do responsavel: requisito publico do case nao atendido.
+- Deploy bonus dispensado. Demonstracao sera local; nao ha URL publica da aplicacao.
+- Executavel e relatorios TXT completos permanecem como complementos locais; nao sao necessarios para executar o repositorio com npm.
+
+Os relatorios [architecture.md](architecture.md) e [ui-modernization.md](ui-modernization.md) registram as etapas. Os links historicos de CI e os slides abaixo representam a entrega anterior, de 23 testes, e nao comprovam as alteracoes atuais.
+
 ## Links
 
 - Repositorio publico: https://github.com/reisgabriel767-max/split-and-go
@@ -12,7 +24,7 @@
 - Treino de logica: [treino-logica.md](treino-logica.md).
 - Evidencias de verificacao: [validation.md](validation.md).
 
-## Pronto no repositorio
+## Funcionalidades e materiais
 
 - [x] Grupos e participantes.
 - [x] Rateios igualitario, percentual e por valor fixo.
@@ -42,7 +54,7 @@
 
 O documento solicita apresentacao em videochamada, nao um video gravado para entrega. gravacao.md e um recurso opcional de ensaio. O preparo dos materiais nao substitui a apresentacao pessoal nem o exercicio ao vivo.
 
-## Conferencia final
+## Conferencia historica - 14/10/2026
 
 Conferido em 14/10/2026: repositorio publico, branch main sincronizada, CI do ultimo codigo aprovada e demonstracao local respondendo HTTP 200. Os dados demonstrativos preservados contem um grupo, quatro membros, quatro despesas e treze partes, com total de R$ 172,57.
 
